@@ -4,8 +4,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node -r dotenv/config src src/index.js",
-    "dev": "nodemon src/index.js 3000",
+    "start": "node -r dotenv/config src src/app.js",
+    "dev": "nodemon src/app.js 3000",
     "deploy": "vercel --prod"
   },
   "keywords": [],
@@ -15,8 +15,12 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.49.4",
     "cors": "^2.8.5",
+    "crypto-js": "^4.2.0",
     "dotenv": "^16.4.7",
-    "express": "^5.1.0"
+    "express": "^5.1.0",
+    "express-validator": "^7.2.1",
+    "http-errors": "^2.0.0",
+    "jsonwebtoken": "^9.0.2"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
