@@ -7,7 +7,7 @@ const hashPwd = (pwd) => {
 };
 
 const verifyPassword = (inputPassword, storedHash) => {
-  const [salt, originalHash] = storedHash.split("$");
+  const [salt, originalHash] = storedHash.split("&&");
   const inputHash = CryptoJS.SHA256(inputPassword + salt).toString();
   return inputHash === originalHash;
 };
