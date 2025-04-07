@@ -1,4 +1,4 @@
-const supabase = require("../DB");
+const supabase = require("../Server");
 
 exports.test = async (req, res) => {
   try {
