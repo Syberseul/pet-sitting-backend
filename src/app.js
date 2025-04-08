@@ -26,15 +26,11 @@ app.use(
       // 不在白名单中则拒绝
       return callback(new Error(`CORS 阻止了来自 ${origin} 的请求`));
     },
-    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // 允许的 HTTP 方法
+    methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"], // 允许的请求头
-    credentials: true, // 允许发送 Cookie
     maxAge: 86400, // 预检请求缓存时间（秒）
   })
 );
-
-// 显式处理 OPTIONS 预检请求
-app.options("*", cors());
 
 app.use((req, res, next) => {
   next(createError(404));
