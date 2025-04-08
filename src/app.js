@@ -7,7 +7,11 @@ app.use(express.json());
 
 app.use(
   cors({
-    origin: ["https://pet-sitting-family.vercel.app", "http://localhost:5173"],
+    origin: [
+      "https://pet-sitting-family.vercel.app",
+      "https://backend-pet-sitting-family.vercel.app",
+      "http://localhost:5173",
+    ],
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"], // 添加 OPTIONS
     allowedHeaders: ["Content-Type", "Authorization"], // 按需添加
   })
