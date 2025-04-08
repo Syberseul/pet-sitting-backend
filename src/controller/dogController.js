@@ -39,12 +39,10 @@ exports.createDogLog = async (req, res) => {
 
     // 返回成功响应
     return res.status(201).json({
-      ...dogLogData,
+      data: { ...dogLogData, dogLogId },
       message: "Dog log created successfully",
-      dogLogId,
     });
   } catch (error) {
-    console.error("Error adding dog log: ", error);
     return res.status(500).json({
       error: "Failed to create dog log",
       details: error.message,
@@ -95,9 +93,8 @@ exports.updateDogLog = async (req, res) => {
 
     // 返回成功响应
     return res.status(201).json({
-      ...dogLogData,
-      message: "Dog log created successfully",
-      dogLogId,
+      data: { ...dogLogData, dogLogId },
+      message: "Dog log updated successfully",
     });
   } catch (err) {
     return res.status(500).json({
