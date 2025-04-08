@@ -8,9 +8,21 @@ app.use(express.json());
 
 app.use("/", require("./router/index"));
 
+const whitelist = [
+  "http://localhost:3000", // 本地开发
+  "http://localhost:5173", // Vite 默认端口
+  "https://pet-sitting-family.vercel.app", // 生产环境前端地址
+];
+
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: (origin, callback) => {
+      if (!origin || whitelist.indexOf(origin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
