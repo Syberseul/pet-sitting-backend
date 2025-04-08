@@ -12,25 +12,26 @@ const allowedOrigins = [
   "https://pet-sitting-family.vercel.app", // 生产前端
 ];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      // 允许无来源的请求（如 Postman、服务器间调用）
-      if (!origin) return callback(null, true);
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
 
-      // 检查域名是否在白名单中
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
+  if (allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization"
+    );
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
 
-      // 不在白名单中则拒绝
-      return callback(new Error(`CORS 阻止了来自 ${origin} 的请求`));
-    },
-    methods: ["GET", "POST", "PUT", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"], // 允许的请求头
-    maxAge: 86400, // 预检请求缓存时间（秒）
-  })
-);
+  // 处理预检请求
+  if (req.method === "OPTIONS") {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
 
 app.use((req, res, next) => {
   next(createError(404));
