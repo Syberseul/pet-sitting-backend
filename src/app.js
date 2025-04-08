@@ -13,6 +13,25 @@ const allowedOrigins = [
   // 添加其他可能的域名（如后端部署后的 URL）
 ];
 
+app.use((req, res, next) => {
+  console.log("===== 收到请求 =====");
+  console.log("请求方法:", req.method);
+  console.log("请求路径:", req.path);
+  console.log("请求头 Origin:", req.headers.origin);
+  console.log("所有请求头:", req.headers);
+
+  // 强制允许所有跨域（仅用于测试！）
+  res.header("Access-Control-Allow-Origin", "*");
+  res.header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS");
+  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+
+  if (req.method === "OPTIONS") {
+    console.log("拦截到 OPTIONS 预检请求，直接返回 204");
+    return res.status(204).end();
+  }
+  next();
+});
+
 app.use(
   cors({
     origin: function (origin, callback) {
