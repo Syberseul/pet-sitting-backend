@@ -15,7 +15,7 @@ module.exports.createToken = async (userInfo) => {
 };
 
 module.exports.verifyToken = async (req, res, next) => {
-  const auth = req.header.authorization;
+  const auth = req.headers.authorization;
   const token = auth ? auth.split("Bearer ")[1] : null;
 
   if (!token) {
@@ -26,8 +26,11 @@ module.exports.verifyToken = async (req, res, next) => {
   try {
     let userInfo = await Verify(token, process.env.JWT_UUID);
     req.user = userInfo;
+    console.log(userInfo);
     next();
   } catch (err) {
-    res.status(402).json({ error: "Invalid token" });
+    if (err.message && err.message === "jwt expired")
+      return res.status(401).json({ error: "Token has expired" });
+    return res.status(402).json({ error: "Invalid token" });
   }
 };
