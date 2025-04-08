@@ -7,9 +7,9 @@ app.use(express.json());
 
 // 动态设置允许的 Origin（避免硬编码）
 const allowedOrigins = [
-  "https://pet-sitting-family.vercel.app/",
+  "https://pet-sitting-family.vercel.app",
   "http://localhost:5173",
-  "https://backend-pet-sitting-family.vercel.app/",
+  "https://backend-pet-sitting-family.vercel.app",
   // 添加其他可能的域名（如后端部署后的 URL）
 ];
 
