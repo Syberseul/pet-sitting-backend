@@ -8,6 +8,13 @@ app.use(express.json());
 
 app.use("/", require("./router/index"));
 
+app.use(
+  cors({
+    origin: ["https://backend-git-master-syberseuls-projects.vercel.app/"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
+  })
+);
+
 app.use((req, res, next) => {
   next(createError(404));
 });
