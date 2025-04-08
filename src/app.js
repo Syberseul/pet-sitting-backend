@@ -10,7 +10,7 @@ app.use("/", require("./router/index"));
 
 app.use(
   cors({
-    origin: ["https://backend-git-master-syberseuls-projects.vercel.app/"],
+    origin: ["http://localhost:5173/"],
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
