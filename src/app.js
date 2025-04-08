@@ -7,8 +7,9 @@ app.use(express.json());
 
 // 动态设置允许的 Origin（避免硬编码）
 const allowedOrigins = [
-  "https://pet-sitting-family.vercel.app",
+  "https://pet-sitting-family.vercel.app/",
   "http://localhost:5173",
+  "https://backend-pet-sitting-family.vercel.app/",
   // 添加其他可能的域名（如后端部署后的 URL）
 ];
 
@@ -16,6 +17,7 @@ app.use(
   cors({
     origin: function (origin, callback) {
       // 允许没有 Origin 的请求（如 Postman、curl）
+      console.log(origin);
       if (!origin) return callback(null, true);
 
       // 检查是否在允许列表中
@@ -30,9 +32,6 @@ app.use(
     credentials: true, // 如果需要跨域传递 Cookie
   })
 );
-
-// 显式处理 OPTIONS 请求（确保预检通过）
-app.options("*", cors());
 
 // 路由
 app.use("/", require("./router/index"));
