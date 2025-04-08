@@ -5,33 +5,9 @@ const createError = require("http-errors");
 const app = express();
 app.use(express.json());
 
-app.use("/", require("./router/index"));
 app.use(cors());
 
-// const allowedOrigins = [
-//   "http://localhost:5173", // 本地开发前端
-//   "https://pet-sitting-family.vercel.app", // 生产前端
-// ];
-
-// app.use(
-//   cors({
-//     origin: function (origin, callback) {
-//       // 允许无来源的请求（如 Postman、服务器间调用）
-//       if (!origin) return callback(null, true);
-
-//       // 检查域名是否在白名单中
-//       if (allowedOrigins.includes(origin)) {
-//         return callback(null, true);
-//       }
-
-//       // 不在白名单中则拒绝
-//       return callback(new Error(`CORS 阻止了来自 ${origin} 的请求`));
-//     },
-//     methods: ["GET", "POST", "PUT", "DELETE"],
-//     allowedHeaders: ["Content-Type", "Authorization"], // 允许的请求头
-//     maxAge: 86400, // 预检请求缓存时间（秒）
-//   })
-// );
+app.use("/", require("./router/index"));
 
 app.use((req, res, next) => {
   next(createError(404));
