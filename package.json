@@ -6,8 +6,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "node -r dotenv/config src/app.js",
     "dev": "nodemon src/app.js",
-    "deploy": "vercel --prod",
-    "vercel-build": "npm install && npm run build"
+    "deploy": "vercel --prod"
   },
   "dependencies": {
     "@vercel/node": "^5.1.14",
