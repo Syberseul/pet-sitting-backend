@@ -103,3 +103,46 @@ exports.login = async (req, res) => {
     });
   }
 };
+
+exports.refreshToken = async (req, res) => {
+  try {
+    const { uid, token, refreshToken, email } = req.body;
+
+    if (!uid || !token || !refreshToken || !email)
+      return res.status(401).json({
+        error: "Missing properties to fresh token.",
+        code: 401,
+      });
+
+    const userRef = db.collection("User");
+    const snapshot = await userRef.where("email", "==", email).limit(1).get();
+
+    if (snapshot.empty)
+      return res.status(401).json({
+        error: "No valid user.",
+        code: 401,
+      });
+
+    const userDoc = snapshot.docs[0];
+
+    const { shortToken, longToken } = await createToken();
+
+    await userDoc.ref.update({
+      token: shortToken,
+      refreshToken: longToken,
+      lastLogin: new Date(),
+    });
+
+    res.status(200).json({
+      token: shortToken,
+      refreshToken: longToken,
+      uid,
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "Internal Error",
+      code: 500,
+      details: {},
+    });
+  }
+};

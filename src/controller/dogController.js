@@ -51,15 +51,12 @@ exports.createDogLog = async (req, res) => {
 };
 
 exports.updateDogLog = async (req, res) => {
-  const dogFormData = req.body;
-  const { breedName, breedType, startDate, endDate, dogName, uid } =
-    dogFormData;
+  const { id } = req.params;
 
-  if (!uid)
-    return res.status(400).json({
-      error: "Missing UID",
-      code: 400,
-    });
+  if (!id) return res.status(401).json({ error: "Missing Log ID", code: 401 });
+
+  const dogFormData = req.body;
+  const { breedName, breedType, startDate, endDate, dogName } = dogFormData;
 
   if (!breedName || !breedType || !startDate || !endDate || !dogName)
     return res.status(400).json({
@@ -70,7 +67,7 @@ exports.updateDogLog = async (req, res) => {
   const dogListRef = db.collection("Dogs_and_Owner");
 
   // 获取指定 uid 的文档引用
-  const dogLogRef = dogListRef.doc(dogLogId); // 使用传入的 dogLogId 查找文档
+  const dogLogRef = dogListRef.doc(id); // 使用传入的 id 查找文档
 
   try {
     const doc = await dogLogRef.get();
@@ -78,7 +75,7 @@ exports.updateDogLog = async (req, res) => {
     if (!doc.exists) await this.createDogLog(req, res);
 
     await dogLogRef.update({
-      ...doc,
+      ...doc.data(),
       breedType: dogFormData.breedType,
       breedName: dogFormData.breedName,
       dogName: dogFormData.dogName,
@@ -93,12 +90,40 @@ exports.updateDogLog = async (req, res) => {
 
     // 返回成功响应
     return res.status(201).json({
-      data: { ...dogLogData, dogLogId },
+      data: { ...dogFormData, uid: id },
       message: "Dog log updated successfully",
     });
   } catch (err) {
     return res.status(500).json({
       error: "Failed to update log",
+      details: err.message,
+      code: 500,
+    });
+  }
+};
+
+exports.getDogLog = async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) return res.status(401).json({ error: "Missing Log ID", code: 401 });
+
+  const dogListRef = db.collection("Dogs_and_Owner");
+
+  const dogLogRef = dogListRef.doc(id);
+
+  try {
+    const doc = await dogLogRef.get();
+
+    if (!doc.exists)
+      return res.status(401).json({ error: "Missing Data", code: 401 });
+
+    return res.status(200).json({
+      ...doc.data(),
+      uid: id,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      error: "Internal error",
       details: err.message,
       code: 500,
     });
