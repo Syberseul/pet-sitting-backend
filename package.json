@@ -1,15 +1,16 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "main": "src/api/index.js",
+  "main": "src/app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node -r dotenv/config src/api/index.js",
-    "dev": "nodemon src/api/index.js",
+    "start": "node -r dotenv/config src/app.js",
+    "dev": "nodemon src/app.js",
     "deploy": "vercel --prod",
     "vercel-build": "npm install && npm run build"
   },
   "dependencies": {
+    "@vercel/node": "^5.1.14",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
     "dotenv": "^16.4.7",
@@ -18,13 +19,13 @@
     "firebase-admin": "^13.2.0",
     "http-errors": "^2.0.0",
     "jsonwebtoken": "^9.0.2",
-    "@vercel/node": "^5.1.14"
+    "path-to-regexp": "^8.2.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.1",
-    "typescript": "^5.8.2",
-    "nodemon": "^3.1.0"
+    "nodemon": "^3.1.0",
+    "typescript": "^5.8.2"
   },
   "engines": {
     "node": ">=18.x"
