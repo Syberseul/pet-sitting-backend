@@ -129,3 +129,24 @@ exports.getDogLog = async (req, res) => {
     });
   }
 };
+
+exports.getAllLogs = async (req, res) => {
+  try {
+    const dogListRef = db.collection("Dogs_and_Owner");
+
+    const snapshot = await dogListRef.get();
+
+    const allLogs = [];
+
+    snapshot.forEach((data) =>
+      allLogs.push({
+        dogLogId: data.id,
+        ...data.data(),
+      })
+    );
+
+    return res.status(200).json(allLogs);
+  } catch (error) {
+    return res.status(500).json({ error: "Internal Error", code: 500 });
+  }
+};
