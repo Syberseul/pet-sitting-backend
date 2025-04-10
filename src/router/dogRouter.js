@@ -15,6 +15,12 @@ router.post(
   modifyDogs,
   dogController.createDogLog
 );
+router.delete(
+  "/removeDogLog/:id",
+  verifyToken,
+  modifyDogs,
+  dogController.removeDogLog
+);
 
 router.put(
   "/updateDogLog/:id",

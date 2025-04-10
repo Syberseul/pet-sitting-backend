@@ -102,6 +102,46 @@ exports.updateDogLog = async (req, res) => {
   }
 };
 
+exports.removeDogLog = async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ error: "Missing Log ID", code: 400 });
+  }
+
+  const dogLogRef = db.collection("Dogs_and_Owner").doc(id);
+
+  try {
+    const doc = await dogLogRef.get();
+
+    if (!doc.exists) {
+      return res.status(404).json({ error: "Document not found", code: 404 });
+    }
+
+    await dogLogRef.delete();
+
+    return res.status(200).json({
+      data: { dogLogId: id },
+      message: "Remove Log success",
+    });
+  } catch (error) {
+    console.error("Error removing document:", error);
+
+    if (error.code === "permission-denied") {
+      return res.status(403).json({
+        error: "Permission denied",
+        code: 403,
+      });
+    }
+
+    return res.status(500).json({
+      error: "Failed to remove log",
+      details: error.message,
+      code: 500,
+    });
+  }
+};
+
 exports.getDogLog = async (req, res) => {
   const { id } = req.params;
 
