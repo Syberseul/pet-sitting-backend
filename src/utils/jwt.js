@@ -26,7 +26,6 @@ module.exports.verifyToken = async (req, res, next) => {
   try {
     let userInfo = await Verify(token, process.env.JWT_UUID);
     req.user = userInfo;
-    console.log(userInfo);
     next();
   } catch (err) {
     if (err.message && err.message === "jwt expired")
