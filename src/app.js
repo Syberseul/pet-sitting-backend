@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const createError = require("http-errors");
+const { verifyPlatform } = require("./middleware/validator/checkPlatform");
 
 const app = express();
 
@@ -24,12 +25,12 @@ app.use(
       }
     },
     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization", "Platform"],
+    allowedHeaders: ["Content-Type", "Authorization", "Platform", "WX_UUID"],
     credentials: true,
   })
 );
 
-app.use("/", require("./router/index"));
+app.use("/", verifyPlatform, require("./router/index"));
 
 app.use((err, req, res, next) => {
   console.error("Error Stack:", err.stack);

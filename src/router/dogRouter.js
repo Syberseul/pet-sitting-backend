@@ -1,32 +1,15 @@
 const express = require("express");
 const router = express.Router();
 
-const { verifyToken } = require("../utils/jwt");
-
 const dogController = require("../controller/dogController");
-const { modifyDogs } = require("../middleware/validator/checkPermission");
 
-router.get("/getDogLog/:id", verifyToken, modifyDogs, dogController.getDogLog);
-router.get("/getAllDogLogs", verifyToken, modifyDogs, dogController.getAllLogs);
+router.get("/getDogLog/:id", dogController.getDogLog);
+router.get("/getAllDogLogs", dogController.getAllLogs);
 
-router.post(
-  "/createDogLog",
-  verifyToken,
-  modifyDogs,
-  dogController.createDogLog
-);
-router.delete(
-  "/removeDogLog/:id",
-  verifyToken,
-  modifyDogs,
-  dogController.removeDogLog
-);
+router.post("/createDogLog", dogController.createDogLog);
 
-router.put(
-  "/updateDogLog/:id",
-  verifyToken,
-  modifyDogs,
-  dogController.updateDogLog
-);
+router.put("/updateDogLog/:id", dogController.updateDogLog);
+
+router.delete("/removeDogLog/:id", dogController.removeDogLog);
 
 module.exports = router;

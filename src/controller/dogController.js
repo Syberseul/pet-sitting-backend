@@ -1,8 +1,23 @@
 const { db, auth } = require("../Server");
 
+const { Platform } = require("../enum");
+
 const { DogFormData } = require("../model/DogModel");
 
 exports.createDogLog = async (req, res) => {
+  const platform = req.headers.Platform;
+
+  if (!platform)
+    return res.status(400).json({
+      error: "Unspecified request platform",
+      code: 400,
+    });
+  else {
+    // 当请求来自微信，额外报错主人微信uniqueId，设置 isFromWX 为 true
+    // 方便通过uniqueId，通过微信小程序直接联系主人
+    console.log(platform);
+  }
+
   const dogFormData = req.body;
   const { breedName, breedType, startDate, endDate, dogName } = dogFormData;
 
@@ -27,6 +42,7 @@ exports.createDogLog = async (req, res) => {
     contactNo: dogFormData.contactNo ?? "",
     notes: dogFormData.notes?.length ? dogFormData.notes : [],
     tourList: [],
+    isFromWX: platform === Platform.wx,
   };
 
   // use Firebase auto-generated UID
@@ -56,6 +72,19 @@ exports.updateDogLog = async (req, res) => {
   if (!id) return res.status(401).json({ error: "Missing Log ID", code: 401 });
 
   const dogFormData = req.body;
+  const platform = req.headers.Platform;
+
+  if (!platform)
+    return res.status(400).json({
+      error: "Unspecified request platform",
+      code: 400,
+    });
+  else {
+    // 当请求来自微信，额外报错主人微信uniqueId，设置 isFromWX 为 true
+    // 方便通过uniqueId，通过微信小程序直接联系主人
+    console.log(platform);
+  }
+
   const { breedName, breedType, startDate, endDate, dogName } = dogFormData;
 
   if (!breedName || !breedType || !startDate || !endDate || !dogName)
@@ -86,6 +115,7 @@ exports.updateDogLog = async (req, res) => {
       ownerName: dogFormData.ownerName ?? "",
       contactNo: dogFormData.contactNo ?? "",
       notes: dogFormData.notes?.length ? dogFormData.notes : [],
+      isFromWX: platform === Platform.wx,
     });
 
     // 返回成功响应

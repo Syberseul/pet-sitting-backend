@@ -1,9 +1,14 @@
-module.exports.UserInfo = {
-  username: "",
-  email: "",
-  password: "",
+const { UserRole } = require("../enum");
+
+module.exports.DefaultUserInfo = {
   createdAt: new Date().getTime(),
-  token: "",
-  refreshToken: "",
-  role: Number(0),
+  role: UserRole.VISITOR,
+
+  id: "",
+  email: "",
+  userName: "",
+  wxId: "",
+  googleId: "",
+  githubId: "",
+  isFromWx: false,
 };

@@ -1,82 +1,169 @@
 const { db, auth } = require("../Server");
+const { Platform, UserRole } = require("../enum");
 
-const { UserInfo } = require("../model/UserModel");
+const { DefaultUserInfo } = require("../model/UserModel");
 
 const { createToken } = require("../utils/jwt");
+
 const { hashPwd, verifyPassword } = require("../utils/pwdUtils");
 
 exports.register = async (req, res) => {
   try {
-    const { email, password, username } = req.body;
+    const isWxPlatform = req.headers.Platform == Platform.WEB;
 
-    const userRecord = await auth.createUser({
-      email,
-      password: hashPwd(password),
-      emailVerified: false,
-    });
+    const { email, password, userName, wxId, googleId, githubId } = req.body;
 
-    const userRef = db.collection("User").doc(userRecord.uid);
+    let userRecord;
+
+    if (isWxPlatform && !wxId)
+      return res.status(400).json({
+        error: "Missing auth property",
+        code: 400,
+      });
+
+    const isEmailAuth = !wxId && !googleId && !githubId;
+
+    if (isEmailAuth) {
+      if (!email || !password)
+        return res.status(400).json({
+          error: "Missing email or password",
+          code: 400,
+        });
+      userRecord = await auth.createUser({
+        email,
+        password: hashPwd(password),
+        emailVerified: false,
+      });
+    } else {
+      const uid = wxId
+        ? `wx_${wxId}`
+        : googleId
+        ? `google_${googleId}`
+        : githubId
+        ? `github_${githubId}`
+        : undefined;
+
+      if (!uid)
+        return res.status(400).json({
+          error: "Missing platform id",
+          code: 400,
+        });
+
+      try {
+        userRecord = await auth.getUser(uid);
+      } catch (error) {
+        userRecord = await auth.createUser({ uid });
+      }
+    }
+
+    // custom token for wxMiniProject
+    const customToken = await auth.createCustomToken(userRecord.uid);
+
     const { shortToken, longToken } = await createToken();
 
-    await userRef.set({
-      ...UserInfo,
-      email,
-      password: hashPwd(password),
-      username,
+    const userRef = db.collection("User").doc(userRecord.uid);
+
+    const userData = {
+      ...DefaultUserInfo,
+      id: userRecord.uid,
+      email: email || "",
+      userName: userName || "",
+      wxId: wxId || "",
+      googleId: googleId || "",
+      githubId: githubId || "",
+      isFromWx: isWxPlatform,
       token: shortToken,
       refreshToken: longToken,
-    });
+    };
 
-    res.status(201).json({
+    if (isEmailAuth) userData.password = hashPwd(password);
+
+    await userRef.set(userData);
+
+    return res.status(201).json({
       uid: userRecord.uid,
-      username,
       email: userRecord.email,
+      userName,
       token: shortToken,
       refreshToken: longToken,
-      role: Number(0),
+      role: UserRole.VISITOR,
+      customToken,
     });
-  } catch (err) {
-    console.error("Register failed:", err);
-
-    res.status(500).json({
-      error: err.errorInfo.message,
+  } catch (error) {
+    return res.status(500).json({
+      error: error.message || "Internal Error",
       code: 500,
-      details: {},
     });
   }
 };
 
 exports.login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, wxId, googleId, githubId } = req.body;
+    const isWxPlatform = req.headers.Platform === Platform.WX;
 
-    if (!email || !password) {
-      return res.status(400).json({
-        error: "Email and password are required.",
-        code: 400,
-      });
-    }
+    const isEmailLogin = !wxId && !googleId && !githubId;
 
-    const userRef = db.collection("User");
-    const snapshot = await userRef.where("email", "==", email).limit(1).get();
+    let userDoc, userData;
 
-    if (snapshot.empty) {
-      return res.status(401).json({
-        error: "Invalid email or password",
-        code: 401,
-      });
-    }
+    if (isEmailLogin) {
+      if (!email || !password) {
+        return res.status(400).json({
+          error: "Email and password are required.",
+          code: 400,
+        });
+      }
 
-    const userDoc = snapshot.docs[0];
-    const userData = userDoc.data();
+      const snapshot = await db
+        .collection("User")
+        .where("email", "==", email)
+        .limit(1)
+        .get();
 
-    const isPwdValid = verifyPassword(password, userData.password);
+      if (snapshot.empty) {
+        return res.status(401).json({
+          error: "Invalid email or password",
+          code: 401,
+        });
+      }
 
-    if (!isPwdValid) {
-      return res.status(401).json({
-        error: "Invalid email or password",
-        code: 401,
-      });
+      userDoc = snapshot.docs[0];
+      userData = userDoc.data();
+
+      const isPwdValid = verifyPassword(password, userData.password);
+      if (!isPwdValid) {
+        return res.status(401).json({
+          error: "Invalid email or password",
+          code: 401,
+        });
+      }
+    } else {
+      const uid = wxId
+        ? `wx_${wxId}`
+        : googleId
+        ? `google_${googleId}`
+        : githubId
+        ? `github_${githubId}`
+        : null;
+
+      if (!uid) {
+        return res.status(400).json({
+          error: "Missing platform identifier",
+          code: 400,
+        });
+      }
+
+      const doc = await db.collection("User").doc(uid).get();
+
+      if (!doc.exists) {
+        return res.status(404).json({
+          error: "User not found",
+          code: 404,
+        });
+      }
+
+      userDoc = doc;
+      userData = doc.data();
     }
 
     const { shortToken, longToken } = await createToken();
@@ -87,43 +174,49 @@ exports.login = async (req, res) => {
       lastLogin: new Date(),
     });
 
-    res.status(200).json({
+    return res.status(200).json({
       uid: userDoc.id,
-      username: userData.username,
       email: userData.email,
+      userName: userData.userName,
       token: shortToken,
       refreshToken: longToken,
-      role: userData.role || 0,
+      role: userData.role || UserRole.VISITOR,
     });
   } catch (error) {
-    res.status(500).json({
+    console.error("Login Error:", error);
+
+    return res.status(500).json({
       error: "Login failed",
       code: 500,
-      details: {},
     });
   }
 };
 
 exports.refreshToken = async (req, res) => {
   try {
-    const { uid, token, refreshToken, email } = req.body;
+    const { uid, token, refreshToken } = req.body;
 
-    if (!uid || !token || !refreshToken || !email)
+    if (!uid || !token || !refreshToken)
       return res.status(401).json({
         error: "Missing properties to fresh token.",
         code: 401,
       });
 
-    const userRef = db.collection("User");
-    const snapshot = await userRef.where("email", "==", email).limit(1).get();
+    const userDoc = await db.collection("User").doc(uid).get();
 
-    if (snapshot.empty)
+    if (!userDoc.exists)
       return res.status(401).json({
-        error: "No valid user.",
+        error: "User not found.",
         code: 401,
       });
 
-    const userDoc = snapshot.docs[0];
+    const userData = userDoc.data();
+
+    if (userData.refreshToken != refreshToken)
+      return res.status(403).json({
+        error: "Invalid refresh token.",
+        code: 403,
+      });
 
     const { shortToken, longToken } = await createToken();
 
