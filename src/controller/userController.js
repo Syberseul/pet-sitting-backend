@@ -170,7 +170,7 @@ exports.login = async (req, res) => {
     }
 
     // custom token for wxMiniProject
-    const customToken = await auth.createCustomToken(userRecord.uid);
+    const customToken = await auth.createCustomToken(userDoc.id);
 
     const { shortToken, longToken } = await createToken();
 
