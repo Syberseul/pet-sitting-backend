@@ -1,5 +1,7 @@
-const { TourInfo } = require("../model/TourModel");
 const { db } = require("../Server");
+
+const { TourInfo } = require("../model/TourModel");
+
 const { interError } = require("../utils/utilFunctions");
 
 const tourCollection = db.collection("DogTours");
@@ -64,7 +66,7 @@ exports.updateTour = async (req, res) => {
       message: "Tour updated",
     });
   } catch (error) {
-    return interError(res, errro);
+    return interError(res, error);
   }
 };
 

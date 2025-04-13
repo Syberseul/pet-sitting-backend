@@ -1,4 +1,5 @@
 const { db, auth } = require("../Server");
+
 const { Platform, UserRole } = require("../enum");
 
 const { DefaultUserInfo } = require("../model/UserModel");
@@ -6,6 +7,8 @@ const { DefaultUserInfo } = require("../model/UserModel");
 const { createToken } = require("../utils/jwt");
 
 const { hashPwd, verifyPassword } = require("../utils/pwdUtils");
+
+const userCollection = db.collection("User");
 
 exports.register = async (req, res) => {
   try {
@@ -61,7 +64,7 @@ exports.register = async (req, res) => {
 
     const { shortToken, longToken } = await createToken();
 
-    const userRef = db.collection("User").doc(userRecord.uid);
+    const userRef = userCollection.doc(userRecord.uid);
 
     const userData = {
       ...DefaultUserInfo,
@@ -115,8 +118,7 @@ exports.login = async (req, res) => {
         });
       }
 
-      const snapshot = await db
-        .collection("User")
+      const snapshot = await userCollection
         .where("email", "==", email)
         .limit(1)
         .get();
@@ -154,7 +156,7 @@ exports.login = async (req, res) => {
         });
       }
 
-      const doc = await db.collection("User").doc(uid).get();
+      const doc = await userCollection.doc(uid).get();
 
       if (!doc.exists) {
         return res.status(404).json({
@@ -203,7 +205,7 @@ exports.refreshToken = async (req, res) => {
         code: 401,
       });
 
-    const userDoc = await db.collection("User").doc(uid).get();
+    const userDoc = await userCollection.doc(uid).get();
 
     if (!userDoc.exists)
       return res.status(401).json({
