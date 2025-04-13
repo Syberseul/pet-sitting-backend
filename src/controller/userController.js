@@ -179,8 +179,6 @@ exports.login = async (req, res) => {
       refreshToken: longToken,
       lastLogin: new Date(),
     });
-
-    console.log("123")
  
     return res.status(200).json({
       uid: userDoc.id,
