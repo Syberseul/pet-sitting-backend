@@ -3,7 +3,7 @@ const { Platform } = require("../../enum");
 require("dotenv").config();
 
 module.exports.verifyPlatform = (req, res, next) => {
-  const platform = req.headers.Platform;
+  const platform = req.headers.platform;
 
   if (!platform)
     return res.status(403).json({

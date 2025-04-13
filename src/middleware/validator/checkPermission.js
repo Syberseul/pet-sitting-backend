@@ -1,3 +1,4 @@
+const { UserRole } = require("../../enum");
 const { db, auth } = require("../../Server");
 
 module.exports.modifyDogs = async (req, res, next) => {
@@ -14,7 +15,8 @@ module.exports.modifyDogs = async (req, res, next) => {
 
     const { role } = snapshot.docs[0].data();
 
-    if (role != 100) return res.status(403).json({ error: "Access denied" });
+    if (role != UserRole.ADMIN)
+      return res.status(403).json({ error: "Access denied" });
 
     next();
   } catch (err) {

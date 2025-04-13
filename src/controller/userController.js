@@ -9,7 +9,7 @@ const { hashPwd, verifyPassword } = require("../utils/pwdUtils");
 
 exports.register = async (req, res) => {
   try {
-    const isWxPlatform = req.headers.Platform == Platform.WEB;
+    const isWxPlatform = req.headers.platform == Platform.WX;
 
     const { email, password, userName, wxId, googleId, githubId } = req.body;
 
@@ -74,6 +74,7 @@ exports.register = async (req, res) => {
       isFromWx: isWxPlatform,
       token: shortToken,
       refreshToken: longToken,
+      lastLogin: new Date().getTime(),
     };
 
     if (isEmailAuth) userData.password = hashPwd(password);
@@ -100,7 +101,7 @@ exports.register = async (req, res) => {
 exports.login = async (req, res) => {
   try {
     const { email, password, wxId, googleId, githubId } = req.body;
-    const isWxPlatform = req.headers.Platform === Platform.WX;
+    const isWxPlatform = req.headers.platform === Platform.WX;
 
     const isEmailLogin = !wxId && !googleId && !githubId;
 

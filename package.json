@@ -18,7 +18,8 @@
     "firebase-admin": "^13.2.0",
     "http-errors": "^2.0.0",
     "jsonwebtoken": "^9.0.2",
-    "path-to-regexp": "^8.2.0"
+    "path-to-regexp": "^8.2.0",
+    "uuid": "^11.1.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

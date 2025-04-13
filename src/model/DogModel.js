@@ -17,3 +17,12 @@ module.exports.TourListData = {
   dailyPrice: 0,
   weight: "",
 };
+
+module.exports.DogInfo = Object.freeze({
+  uid: "",
+  breedType: "", // use to search random preview img
+  dogName: "",
+  ownerId: "", // link to Owner uid
+  weight: 0,
+  alive: true,
+});
