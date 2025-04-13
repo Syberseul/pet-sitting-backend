@@ -180,6 +180,8 @@ exports.login = async (req, res) => {
       lastLogin: new Date(),
     });
 
+    console.log("123")
+ 
     return res.status(200).json({
       uid: userDoc.id,
       email: userData.email,
