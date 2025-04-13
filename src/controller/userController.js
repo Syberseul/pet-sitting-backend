@@ -169,6 +169,9 @@ exports.login = async (req, res) => {
       userData = doc.data();
     }
 
+    // custom token for wxMiniProject
+    const customToken = await auth.createCustomToken(userRecord.uid);
+
     const { shortToken, longToken } = await createToken();
 
     await userDoc.ref.update({
@@ -184,6 +187,7 @@ exports.login = async (req, res) => {
       token: shortToken,
       refreshToken: longToken,
       role: userData.role || UserRole.VISITOR,
+      customToken,
     });
   } catch (error) {
     console.error("Login Error:", error);
