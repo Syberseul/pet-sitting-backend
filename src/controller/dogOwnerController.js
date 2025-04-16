@@ -44,6 +44,7 @@ exports.createDogOwner = async (req, res) => {
       contactNo: contactNo ?? "",
       isFromWx,
       wxId: wxId ?? "",
+      uid: ownerListId,
     };
 
     try {
@@ -120,6 +121,24 @@ exports.getDogOwnerInfo = async (req, res) => {
       ...doc.data(),
       uid: id,
     });
+  } catch (error) {
+    return interError(res, error);
+  }
+};
+
+exports.getAllDogOwners = async (req, res) => {
+  try {
+    const snapShot = await dogOwnerCollection.get();
+
+    const owners = [];
+
+    snapShot.forEach((owner) => {
+      owners.push({
+        ...owner.data(),
+      });
+    });
+
+    return res.status(200).json(owners);
   } catch (error) {
     return interError(res, error);
   }

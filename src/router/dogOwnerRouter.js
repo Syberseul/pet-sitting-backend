@@ -9,4 +9,6 @@ router.put("/update/:id", dogOwnerController.updateDogOwner);
 
 router.get("/detail/:id", dogOwnerController.getDogOwnerInfo);
 
+router.get("/all", dogOwnerController.getAllDogOwners);
+
 module.exports = router;
