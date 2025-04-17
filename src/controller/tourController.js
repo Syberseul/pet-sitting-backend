@@ -4,6 +4,8 @@ const { TourInfo } = require("../model/TourModel");
 
 const { interError } = require("../utils/utilFunctions");
 
+const admin = require("firebase-admin");
+
 const tourCollection = db.collection("DogTours");
 const allDataList = db.collection("List");
 
@@ -26,7 +28,7 @@ exports.createTour = async (req, res) => {
 
     const allToursRef = allDataList.doc("AllTours");
 
-    await allToursRef.set({
+    await allToursRef.update({
       [tourListId]: { ...tourData, uid: tourListId },
     });
 
@@ -95,6 +97,10 @@ exports.removeTour = async (req, res) => {
       return res.status(404).json({ error: "Tour not found", code: 404 });
 
     await tourRef.delete();
+
+    await allDataList
+      .doc("AllTours")
+      .update({ [id]: admin.firestore.FieldValue.delete() });
 
     return res.status(200).json({
       data: { uid: id },

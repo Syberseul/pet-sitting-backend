@@ -53,7 +53,7 @@ exports.createDogOwner = async (req, res) => {
 
       const allOwnersRef = allDataList.doc("AllDogOwners");
 
-      await allOwnersRef.set({
+      await allOwnersRef.update({
         [ownerListId]: { ...ownerData, uid: ownerListId },
       });
 
