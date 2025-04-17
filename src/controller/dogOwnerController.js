@@ -12,6 +12,7 @@ const {
 const { v4: uuid } = require("uuid");
 
 const dogOwnerCollection = db.collection("DogOwner");
+const allDataList = db.collection("List");
 
 exports.createDogOwner = async (req, res) => {
   try {
@@ -49,6 +50,12 @@ exports.createDogOwner = async (req, res) => {
 
     try {
       await ownerListRef.set(ownerData);
+
+      const allOwnersRef = allDataList.doc("AllDogOwners");
+
+      await allOwnersRef.set({
+        [ownerListId]: { ...ownerData, uid: ownerListId },
+      });
 
       return res.status(201).json({
         data: { ...ownerData, uid: ownerListId },
@@ -94,6 +101,10 @@ exports.updateDogOwner = async (req, res) => {
 
     await ownerRef.update(data);
 
+    await allDataList.doc("AllDogOwners").update({
+      [id]: data,
+    });
+
     return res.status(200).json({
       data,
       message: "Owner updated",
@@ -128,17 +139,30 @@ exports.getDogOwnerInfo = async (req, res) => {
 
 exports.getAllDogOwners = async (req, res) => {
   try {
-    const snapShot = await dogOwnerCollection.get();
+    // const snapShot = await dogOwnerCollection.get();
 
-    const owners = [];
+    // const owners = [];
 
-    snapShot.forEach((owner) => {
-      owners.push({
-        ...owner.data(),
+    // snapShot.forEach((owner) => {
+    //   owners.push({
+    //     ...owner.data(),
+    //   });
+    // });
+
+    // return res.status(200).json(owners);
+    const allOwners = await allDataList.doc("AllDogOwners").get();
+
+    if (!allOwners.exists)
+      return res.status(404).json({
+        error: "No collection table found",
+        code: 404,
       });
-    });
 
-    return res.status(200).json(owners);
+    const allOwnersData = allOwners.data();
+
+    const ownersArray = Object.values(allOwnersData);
+
+    return res.status(200).json(ownersArray);
   } catch (error) {
     return interError(res, error);
   }

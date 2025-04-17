@@ -5,6 +5,7 @@ const { TourInfo } = require("../model/TourModel");
 const { interError } = require("../utils/utilFunctions");
 
 const tourCollection = db.collection("DogTours");
+const allDataList = db.collection("List");
 
 exports.createTour = async (req, res) => {
   const { dogId, ownerId } = req.body;
@@ -22,6 +23,12 @@ exports.createTour = async (req, res) => {
 
   try {
     await tourListRef.set({ ...tourData, uid: tourListId });
+
+    const allToursRef = allDataList.doc("AllTours");
+
+    await allToursRef.set({
+      [tourListId]: { ...tourData, uid: tourListId },
+    });
 
     return res.status(201).json({
       data: { ...tourData, uid: tourListId },
@@ -61,6 +68,10 @@ exports.updateTour = async (req, res) => {
 
     await tourRef.update(data);
 
+    await allDataList.doc("AllTours").update({
+      [id]: data,
+    });
+
     return res.status(200).json({
       data,
       message: "Tour updated",
@@ -96,17 +107,30 @@ exports.removeTour = async (req, res) => {
 
 exports.getAllTours = async (req, res) => {
   try {
-    const snapShot = await tourCollection.get();
+    // const snapShot = await tourCollection.get();
 
-    const tours = [];
+    // const tours = [];
 
-    snapShot.forEach((tour) => {
-      tours.push({
-        ...tour.data(),
+    // snapShot.forEach((tour) => {
+    //   tours.push({
+    //     ...tour.data(),
+    //   });
+    // });
+
+    // return res.status(200).json(tours);
+    const allTours = await allDataList.doc("AllTours").get();
+
+    if (!allTours.exists)
+      return res.status(404).json({
+        error: "No collection table found",
+        code: 404,
       });
-    });
 
-    return res.status(200).json(tours);
+    const allToursData = allTours.data();
+
+    const toursArray = Object.values(allToursData);
+
+    return res.status(200).json(toursArray);
   } catch (error) {
     return interError(res, error);
   }
