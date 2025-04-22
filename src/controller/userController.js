@@ -3,6 +3,7 @@ const { db, auth } = require("../Server");
 const { Platform, UserRole } = require("../enum");
 
 const { DefaultUserInfo } = require("../model/UserModel");
+const { getWxOpenId } = require("../utils/auth_WX");
 
 const { createToken } = require("../utils/jwt");
 
@@ -159,6 +160,11 @@ exports.login = async (req, res) => {
       const doc = await userCollection.doc(uid).get();
 
       if (!doc.exists) {
+        if (isWxPlatform && wxId) {
+          const openId = await getWxOpenId(wxId);
+          console.log(openId);
+        }
+
         return res.status(404).json({
           error: "User not found",
           code: 404,
@@ -179,7 +185,7 @@ exports.login = async (req, res) => {
       refreshToken: longToken,
       lastLogin: new Date(),
     });
- 
+
     return res.status(200).json({
       uid: userDoc.id,
       email: userData.email,
