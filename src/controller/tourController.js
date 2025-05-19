@@ -113,17 +113,6 @@ exports.removeTour = async (req, res) => {
 
 exports.getAllTours = async (req, res) => {
   try {
-    // const snapShot = await tourCollection.get();
-
-    // const tours = [];
-
-    // snapShot.forEach((tour) => {
-    //   tours.push({
-    //     ...tour.data(),
-    //   });
-    // });
-
-    // return res.status(200).json(tours);
     const allTours = await allDataList.doc("AllTours").get();
 
     if (!allTours.exists)

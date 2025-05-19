@@ -9,6 +9,8 @@ module.exports.DogFormData = {
   endDate: "",
   breedName: "",
   notes: [],
+  sex: 0, // 0 - unknown, 1 - male, 2 - female
+  desex: false,
 };
 
 module.exports.TourListData = {
@@ -25,4 +27,6 @@ module.exports.DogInfo = Object.freeze({
   ownerId: "", // link to Owner uid
   weight: 0,
   alive: true,
+  sex: 0,
+  desex: false,
 });

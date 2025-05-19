@@ -139,17 +139,6 @@ exports.getDogOwnerInfo = async (req, res) => {
 
 exports.getAllDogOwners = async (req, res) => {
   try {
-    // const snapShot = await dogOwnerCollection.get();
-
-    // const owners = [];
-
-    // snapShot.forEach((owner) => {
-    //   owners.push({
-    //     ...owner.data(),
-    //   });
-    // });
-
-    // return res.status(200).json(owners);
     const allOwners = await allDataList.doc("AllDogOwners").get();
 
     if (!allOwners.exists)

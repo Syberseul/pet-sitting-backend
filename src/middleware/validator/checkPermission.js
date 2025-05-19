@@ -15,10 +15,16 @@ module.exports.modifyDogs = async (req, res, next) => {
 
     const { role } = snapshot.docs[0].data();
 
-    if (role != UserRole.ADMIN)
+    if (role == UserRole.VISITOR) {
       return res.status(403).json({ error: "Access denied" });
-
-    next();
+    } else if (role == UserRole.ADMIN || role == UserRole.DEVELOPER) {
+      next();
+      return;
+    } else if (role == UserRole.DOG_OWNER) {
+      // TODO: check owners dog list and return 403 if dog id that trying to modify is not belong to this owner
+      next();
+      return;
+    } else return res.status(403).json({ error: "Access denied" });
   } catch (err) {
     if (err.message && err.message === "jwt expired") {
       return res.status(401).json({ error: "Token expired" });

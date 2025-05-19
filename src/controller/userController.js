@@ -209,11 +209,12 @@ exports.refreshToken = async (req, res) => {
   try {
     const { uid, token, refreshToken } = req.body;
 
-    if (!uid || !token || !refreshToken)
+    if (!uid || !token || !refreshToken) {
       return res.status(401).json({
         error: "Missing properties to fresh token.",
         code: 401,
       });
+    }
 
     const userDoc = await userCollection.doc(uid).get();
 

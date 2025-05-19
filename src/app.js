@@ -10,6 +10,7 @@ app.use(express.json());
 const allowedOrigins = [
   "https://pet-sitting-family.vercel.app",
   "http://localhost:5173",
+  "http://localhost:45598",
   "https://backend-pet-sitting-family.vercel.app",
 ];
 
