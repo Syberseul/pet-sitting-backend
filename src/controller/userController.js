@@ -109,7 +109,9 @@ exports.login = async (req, res) => {
 
     const isEmailLogin = !wxId && !googleId && !githubId;
 
-    let userDoc, userData, fcmTokens;
+    let userDoc,
+      userData,
+      fcmTokens = [];
 
     if (isEmailLogin) {
       if (!email || !password) {
