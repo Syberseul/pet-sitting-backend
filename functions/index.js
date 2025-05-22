@@ -6,7 +6,8 @@ const NotificationService = require("./Service/notificationService");
 
 exports.checkNotifications = onSchedule(
   {
-    schedule: "every 30 minutes", // run function every 30 mins
+    schedule: "0 19 * * *", // run function everyday at 7pm
+    // schedule: "every 30 minutes", // run function every 30 mins
     // schedule: "every 1 minutes", // test every 1 min
     timeoutSeconds: 300, // 5 mins timeout
     timeZone: "Australia/Melbourne",
