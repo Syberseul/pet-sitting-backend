@@ -104,12 +104,12 @@ exports.register = async (req, res) => {
 
 exports.login = async (req, res) => {
   try {
-    const { email, password, wxId, googleId, githubId } = req.body;
+    const { email, password, wxId, googleId, githubId, fcmToken } = req.body;
     const isWxPlatform = req.headers.platform === Platform.WX;
 
     const isEmailLogin = !wxId && !googleId && !githubId;
 
-    let userDoc, userData;
+    let userDoc, userData, fcmTokens;
 
     if (isEmailLogin) {
       if (!email || !password) {
@@ -175,6 +175,12 @@ exports.login = async (req, res) => {
       userData = doc.data();
     }
 
+    if (fcmToken) {
+      fcmTokens = userData.fcmTokens || [];
+
+      if (!fcmTokens.includes(fcmToken)) fcmTokens.push(fcmToken);
+    }
+
     // custom token for wxMiniProject
     const customToken = await auth.createCustomToken(userDoc.id);
 
@@ -184,6 +190,7 @@ exports.login = async (req, res) => {
       token: shortToken,
       refreshToken: longToken,
       lastLogin: new Date(),
+      fcmTokens: fcmTokens,
     });
 
     return res.status(200).json({
@@ -200,6 +207,49 @@ exports.login = async (req, res) => {
 
     return res.status(500).json({
       error: "Login failed",
+      code: 500,
+    });
+  }
+};
+
+exports.logout = async (req, res) => {
+  try {
+    const { fcmToken, userId } = req.body;
+
+    if (!userId) {
+      return res.status(400).json({
+        error: "Missing user ID",
+        code: 400,
+      });
+    }
+
+    const userDoc = await userCollection.doc(userId).get();
+    if (!userDoc.exists) {
+      return res.status(404).json({
+        error: "User not found",
+        code: 404,
+      });
+    }
+
+    if (fcmToken) {
+      const currentTokens = userDoc.data().fcmTokens || [];
+      const updatedTokens = currentTokens.filter((token) => token !== fcmToken);
+
+      await userDoc.ref.update({
+        fcmTokens: updatedTokens,
+        token: null,
+        refreshToken: null,
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      message: "Logged out successfully",
+    });
+  } catch (error) {
+    console.error("Logout Error:", error);
+    return res.status(500).json({
+      error: "Internal server error",
       code: 500,
     });
   }
