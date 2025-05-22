@@ -1,19 +1,25 @@
-/**
- * Import function triggers from their respective submodules:
- *
- * const {onCall} = require("firebase-functions/v2/https");
- * const {onDocumentWritten} = require("firebase-functions/v2/firestore");
- *
- * See a full list of supported triggers at https://firebase.google.com/docs/functions
- */
+const { onSchedule } = require("firebase-functions/v2/scheduler");
 
-const {onRequest} = require("firebase-functions/v2/https");
-const logger = require("firebase-functions/logger");
+const { log, error } = require("firebase-functions/logger");
 
-// Create and deploy your first functions
-// https://firebase.google.com/docs/functions/get-started
+const NotificationService = require("./Service/notificationService");
 
-// exports.helloWorld = onRequest((request, response) => {
-//   logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
+exports.checkNotifications = onSchedule(
+  {
+    schedule: "every 30 minutes", // run function every 30 mins
+    // schedule: "every 1 minutes", // test every 1 min
+    timeoutSeconds: 300, // 5 mins timeout
+    timeZone: "Australia/Melbourne",
+    region: "australia-southeast1",
+  },
+  async () => {
+    try {
+      await NotificationService.checkPendingNotifications();
+      log("Successfully triggered timer function!");
+    } catch (err) {
+      error(
+        `❌ Failed trigger timer function: ${err?.message ?? "Unknown error"}`
+      );
+    }
+  }
+);
