@@ -1,4 +1,5 @@
 const { Platform } = require("../enum");
+const { format } = require("date-fns-tz");
 
 exports.interError = (res, err) =>
   res.status(500).json({
@@ -13,3 +14,15 @@ exports.missingWxProperty = (res) =>
     error: "Missing wx auth property",
     code: 400,
   });
+
+exports.getNotificationTime = (dateTime) => {
+  const reminderTime = new Date(dateTime);
+  reminderTime.setDate(reminderTime.getDate() - 1);
+  reminderTime.setHours(20, 0, 0, 0);
+
+  const formattedDate = format(reminderTime, "yyyy-MM-dd HH:mm:ss", {
+    timeZone: "Australia/Melbourne",
+  });
+
+  return new Date(formattedDate);
+};

@@ -1,9 +1,11 @@
 const admin = require("firebase-admin");
 
-const { db, messaging } = require("./index");
+const { db } = require("./index");
 const { notificationStatus } = require("./enums");
+const { getNotificationTime } = require("../utils/utilFunctions");
 
 const scheduleNotifications = db.collection("scheduleNotifications");
+const allDataList = db.collection("List");
 
 class NotificationService {
   static async scheduleTourNotification(tourData) {
@@ -15,23 +17,32 @@ class NotificationService {
     // if endDate is before today, no need to schedule a notification for this tour
     if (endDate < today) return;
 
-    // set reminder time to the day before start date at 8pm
-    const reminderTime = new Date(tourData.startDate);
-    reminderTime.setDate(reminderTime.getDate() - 1);
-    reminderTime.setHours(20, 0, 0, 0);
+    const notificationTime = getNotificationTime(tourData.startDate);
 
-    const notificationRef = scheduleNotifications.doc(tourData.uid);
+    const notificationRef = scheduleNotifications.doc();
 
-    // TODO: make sure here tourData has valid uid
-    await notificationRef.set({
-      tourId: tourData.uid,
-      status: notificationStatus.PENDING,
-      userId: null, // in the future maybe needed to determine which type of user would receive such notifications
-      executeAt: admin.firestore.Timestamp.fromDate(reminderTime),
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-    });
+    if (!tourData.uid) return;
 
-    return notificationRef.id;
+    try {
+      const notificationData = {
+        tourId: tourData.uid,
+        status: notificationStatus.PENDING,
+        userId: null, // in the future maybe needed to determine which type of user would receive such notifications
+        executeAt: admin.firestore.Timestamp.fromDate(notificationTime),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      await notificationRef.set(notificationData);
+
+      const AllNotificationsRef = allDataList.doc("AllNotifications") || [];
+      const notificationId = notificationRef.id;
+
+      await AllNotificationsRef.update({
+        [notificationId]: { ...notificationData, uid: notificationId },
+      });
+    } catch (err) {
+      console.log(err);
+    }
   }
 
   static async updateTourNotification(tourId, newTourData) {
@@ -47,48 +58,80 @@ class NotificationService {
       return;
     }
 
-    const snapshot = await scheduleNotifications
-      .where("tourId", "==", tourId)
-      .where("status", "in", [
-        notificationStatus.PENDING,
-        notificationStatus.CANCELLED,
-      ])
-      .limit(1)
-      .get();
+    try {
+      const snapshot = await scheduleNotifications
+        .where("tourId", "==", tourId)
+        .where("status", "in", [
+          notificationStatus.PENDING,
+          notificationStatus.CANCELLED,
+        ])
+        .limit(1)
+        .get();
 
-    if (snapshot.empty) {
-      return this.scheduleTourNotification(newTourData);
-    } else {
-      const reminderTime = new Date(newTourData.startDate);
-      reminderTime.setDate(reminderTime.getDate() - 1);
-      reminderTime.setHours(20, 0, 0, 0);
+      if (snapshot.empty) {
+        return this.scheduleTourNotification(newTourData);
+      } else {
+        const notificationTime = getNotificationTime(newTourData.startDate);
 
-      await snapshot.docs[0].ref.update({
-        executeAt: admin.firestore.Timestamp.fromDate(reminderTime),
-        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-        status: notificationStatus.PENDING,
-      });
+        const updatedData = {
+          ...snapshot.docs[0].data(),
+          executeAt: admin.firestore.Timestamp.fromDate(notificationTime),
+          lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+          status: notificationStatus.PENDING,
+        };
+
+        await snapshot.docs[0].ref.update(updatedData);
+
+        await allDataList.doc("AllNotifications").update({
+          [tourId]: updatedData,
+        });
+      }
+    } catch (err) {
+      console.log(err);
     }
   }
 
   static async cancelTourNotification(tourId) {
-    const batch = db.batch();
-    const notifications = await scheduleNotifications
-      .where("tourId", "==", tourId)
-      .where("status", "in", [
-        notificationStatus.PENDING,
-        notificationStatus.PROCESSING,
-      ])
-      .get();
+    try {
+      const snapshot = await scheduleNotifications
+        .where("tourId", "==", tourId)
+        .where("status", "in", [
+          notificationStatus.PENDING,
+          notificationStatus.PROCESSING,
+        ])
+        .limit(1)
+        .get();
 
-    notifications.forEach((doc) => {
-      batch.update(doc.ref, {
+      if (snapshot.empty) {
+        console.log("No active notifications found for tourId: ", tourId);
+        return;
+      }
+
+      const notificationDoc = snapshot.docs[0];
+      const notificationId = notificationDoc.id;
+
+      const batch = db.batch();
+
+      batch.update(notificationDoc.ref, {
+        ...notificationDoc.data(),
         status: notificationStatus.CANCELLED,
         cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
       });
-    });
 
-    await batch.commit();
+      const AllNotificationsRef = allDataList.doc("AllNotifications");
+
+      batch.update(AllNotificationsRef, {
+        [notificationId]: {
+          ...notificationDoc.data(),
+          status: notificationStatus.CANCELLED,
+          cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
+        },
+      });
+
+      await batch.commit();
+    } catch (err) {
+      console.log(err);
+    }
   }
 }
 
