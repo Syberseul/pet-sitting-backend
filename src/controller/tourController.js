@@ -4,8 +4,6 @@ const { TourInfo } = require("../model/TourModel");
 
 const { interError } = require("../utils/utilFunctions");
 
-const NotificationService = require("../../functions/Service/notificationService");
-
 const admin = require("firebase-admin");
 
 const tourCollection = db.collection("DogTours");
@@ -35,8 +33,6 @@ exports.createTour = async (req, res) => {
     await allToursRef.update({
       [tourListId]: savedTour,
     });
-
-    await NotificationService.scheduleTourNotification(savedTour);
 
     return res.status(201).json({
       data: savedTour,
@@ -80,8 +76,6 @@ exports.updateTour = async (req, res) => {
       [id]: data,
     });
 
-    await NotificationService.updateTourNotification(data.id, data);
-
     return res.status(200).json({
       data,
       message: "Tour updated",
@@ -109,8 +103,6 @@ exports.removeTour = async (req, res) => {
     await allDataList
       .doc("AllTours")
       .update({ [id]: admin.firestore.FieldValue.delete() });
-
-    await NotificationService.cancelTourNotification(id);
 
     return res.status(200).json({
       data: { uid: id },
