@@ -1,7 +1,7 @@
 const admin = require("firebase-admin");
 
-const { db, messaging } = require("../firebase");
-const { notificationStatus } = require("../enums");
+const { db, messaging } = require("./index");
+const { notificationStatus } = require("./enums");
 
 const scheduleNotifications = db.collection("scheduleNotifications");
 
