@@ -4,6 +4,8 @@ const { TourInfo } = require("../model/TourModel");
 
 const { interError } = require("../utils/utilFunctions");
 
+const NotificationService = require("../../functions/Service/notificationService");
+
 const admin = require("firebase-admin");
 
 const tourCollection = db.collection("DogTours");
@@ -24,16 +26,20 @@ exports.createTour = async (req, res) => {
   const tourListId = tourListRef.id;
 
   try {
-    await tourListRef.set({ ...tourData, uid: tourListId });
+    const savedTour = { ...tourData, uid: tourListId };
+
+    await tourListRef.set(savedTour);
 
     const allToursRef = allDataList.doc("AllTours");
 
     await allToursRef.update({
-      [tourListId]: { ...tourData, uid: tourListId },
+      [tourListId]: savedTour,
     });
 
+    await NotificationService.scheduleTourNotification(savedTour);
+
     return res.status(201).json({
-      data: { ...tourData, uid: tourListId },
+      data: savedTour,
       message: "Tour created",
     });
   } catch (error) {
@@ -74,6 +80,8 @@ exports.updateTour = async (req, res) => {
       [id]: data,
     });
 
+    await NotificationService.updateTourNotification(data.id, data);
+
     return res.status(200).json({
       data,
       message: "Tour updated",
@@ -101,6 +109,8 @@ exports.removeTour = async (req, res) => {
     await allDataList
       .doc("AllTours")
       .update({ [id]: admin.firestore.FieldValue.delete() });
+
+    await NotificationService.cancelTourNotification(id);
 
     return res.status(200).json({
       data: { uid: id },
