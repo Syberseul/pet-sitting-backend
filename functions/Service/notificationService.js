@@ -8,8 +8,6 @@ const { notificationStatus } = require("../enums");
 const scheduleNotifications = db.collection("scheduleNotifications");
 const allDataList = db.collection("List");
 
-const batch = db.batch();
-
 class NotificationService {
   static async sendInstantNotification(message, data = {}) {
     try {
@@ -86,6 +84,8 @@ class NotificationService {
         scheduleNotificationRefs.push(scheduleNotifications.doc(id));
         allNotifications[id].status = notificationStatus.PROCESSING;
       });
+
+      const batch = db.batch();
 
       scheduleNotificationRefs.forEach((ref) => {
         batch.update(ref, { status: notificationStatus.PROCESSING });

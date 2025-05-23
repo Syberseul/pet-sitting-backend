@@ -2,7 +2,10 @@ const admin = require("firebase-admin");
 
 const { db } = require("./index");
 const { notificationStatus } = require("./enums");
-const { getNotificationTime } = require("../utils/utilFunctions");
+const {
+  getNotificationTime,
+  isValidDateSendingNotification,
+} = require("../utils/utilFunctions");
 
 const scheduleNotifications = db.collection("scheduleNotifications");
 const allDataList = db.collection("List");
@@ -11,11 +14,9 @@ class NotificationService {
   static async scheduleTourNotification(tourData) {
     if (!tourData.startDate || !tourData.endDate || !tourData.uid) return;
 
-    const today = new Date();
-    const endDate = new Date(tourData.endDate);
-
-    // if endDate is before today, no need to schedule a notification for this tour
-    if (endDate < today) return;
+    // if startDate is before or equal to today, no need to schedule a notification for this tour
+    if (!isValidDateSendingNotification(tourData.startDate, tourData.endDate))
+      return;
 
     const notificationTime = getNotificationTime(tourData.startDate);
 
@@ -49,14 +50,14 @@ class NotificationService {
     if (!newTourData.startDate || !newTourData.endDate || !newTourData.uid)
       return;
 
-    const today = new Date();
-    const endDate = new Date(newTourData.endDate);
-
-    // if endDate is before today, no need to update notification time of this tour, instead need to cancel this notification
-    if (endDate < today) {
-      await this.cancelTourNotification(newTourData.uid);
+    // if startDate is before or equal to today, no need to schedule a notification for this tour
+    if (
+      !isValidDateSendingNotification(
+        newTourData.startDate,
+        newTourData.endDate
+      )
+    )
       return;
-    }
 
     try {
       const snapshot = await scheduleNotifications
@@ -83,7 +84,7 @@ class NotificationService {
         await snapshot.docs[0].ref.update(updatedData);
 
         await allDataList.doc("AllNotifications").update({
-          [tourId]: updatedData,
+          [snapshot.docs[0].id]: updatedData,
         });
       }
     } catch (err) {
