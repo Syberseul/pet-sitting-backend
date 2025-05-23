@@ -1,4 +1,8 @@
 const { db } = require("../Server");
+const {
+  dbCollectionName,
+  dbCollectionDocName,
+} = require("../Server/enums/dbEnum");
 const { DogInfo } = require("../model/DogModel");
 
 const { DogOwnerInfo } = require("../model/UserModel");
@@ -11,8 +15,8 @@ const {
 
 const { v4: uuid } = require("uuid");
 
-const dogOwnerCollection = db.collection("DogOwner");
-const allDataList = db.collection("List");
+const dogOwnerCollection = db.collection(dbCollectionName.DOG_OWNER);
+const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
 
 exports.createDogOwner = async (req, res) => {
   try {
@@ -51,7 +55,7 @@ exports.createDogOwner = async (req, res) => {
     try {
       await ownerListRef.set(ownerData);
 
-      const allOwnersRef = allDataList.doc("AllDogOwners");
+      const allOwnersRef = allDataList.doc(dbCollectionDocName.ALL_DOG_OWNERS);
 
       await allOwnersRef.update({
         [ownerListId]: { ...ownerData, uid: ownerListId },
@@ -101,7 +105,7 @@ exports.updateDogOwner = async (req, res) => {
 
     await ownerRef.update(data);
 
-    await allDataList.doc("AllDogOwners").update({
+    await allDataList.doc(dbCollectionDocName.ALL_DOG_OWNERS).update({
       [id]: data,
     });
 
@@ -139,7 +143,9 @@ exports.getDogOwnerInfo = async (req, res) => {
 
 exports.getAllDogOwners = async (req, res) => {
   try {
-    const allOwners = await allDataList.doc("AllDogOwners").get();
+    const allOwners = await allDataList
+      .doc(dbCollectionDocName.ALL_DOG_OWNERS)
+      .get();
 
     if (!allOwners.exists)
       return res.status(404).json({

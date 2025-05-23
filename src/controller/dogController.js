@@ -1,4 +1,5 @@
 const { db } = require("../Server");
+const { dbCollectionName } = require("../Server/enums/dbEnum");
 
 const { DogInfo } = require("../model/DogModel");
 
@@ -6,7 +7,7 @@ const { interError } = require("../utils/utilFunctions");
 
 const { v4: uuid } = require("uuid");
 
-const dogOwnerCollection = db.collection("DogOwner");
+const dogOwnerCollection = db.collection(dbCollectionName.DOG_OWNER);
 
 exports.createDog = async (req, res) => {
   const { ownerId, breedType, dogName, weight, alive } = req.body;

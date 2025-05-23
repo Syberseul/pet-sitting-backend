@@ -1,4 +1,5 @@
 const { db, auth } = require("../Server");
+const { dbCollectionName } = require("../Server/enums/dbEnum");
 
 const { Platform, UserRole } = require("../enum");
 
@@ -9,7 +10,7 @@ const { createToken } = require("../utils/jwt");
 
 const { hashPwd, verifyPassword } = require("../utils/pwdUtils");
 
-const userCollection = db.collection("User");
+const userCollection = db.collection(dbCollectionName.USER);
 
 exports.register = async (req, res) => {
   try {

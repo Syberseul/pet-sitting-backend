@@ -3,10 +3,21 @@ const admin = require("firebase-admin");
 const { error, log } = require("firebase-functions/logger");
 
 const { db, messaging } = require("../firebase");
-const { notificationStatus } = require("../enums");
+const {
+  notificationStatus,
+  dbCollectionName,
+  dbCollectionDocName,
+} = require("../enums");
 
-const scheduleNotifications = db.collection("scheduleNotifications");
-const allDataList = db.collection("List");
+const ScheduledNewTourNotifications = db.collection(
+  dbCollectionName.NEW_TOUR_NOTIFICATIONS
+);
+const ScheduledEndTourNotifications = db.collection(
+  dbCollectionName.END_TOUR_NOTIFICATIONS
+);
+const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
+
+const LIMIT_SENDING_NOTIFICATIONS = 100;
 
 class NotificationService {
   static async sendInstantNotification(message, data = {}) {
@@ -43,7 +54,7 @@ class NotificationService {
     }
   }
 
-  static async checkPendingNotifications() {
+  static async checkPendingNewNotifications() {
     const now = admin.firestore.Timestamp.now();
     const threshold = new admin.firestore.Timestamp(
       now.seconds + 300, // 5分钟时间窗口
@@ -52,11 +63,11 @@ class NotificationService {
 
     try {
       const allNotificationsDoc = await allDataList
-        .doc("AllNotifications")
+        .doc(dbCollectionDocName.ALL_NEW_TOUR_NOTIFICATIONS)
         .get();
 
       if (!allNotificationsDoc.exists) {
-        error("AllNotifications document does not exist!");
+        error("AllNewTourNotifications document does not exist!");
         return;
       }
 
@@ -69,10 +80,10 @@ class NotificationService {
             notification.status == notificationStatus.PENDING &&
             notification.executeAt <= threshold
         )
-        .slice(0, 100);
+        .slice(0, LIMIT_SENDING_NOTIFICATIONS);
 
       if (pendingNotifications.length == 0) {
-        log("No pending notifications");
+        log("No pending NEW notifications");
         return;
       }
 
@@ -81,7 +92,7 @@ class NotificationService {
 
       pendingNotifications.forEach(([id, notification]) => {
         tourIds.push(notification.tourId);
-        scheduleNotificationRefs.push(scheduleNotifications.doc(id));
+        scheduleNotificationRefs.push(ScheduledNewTourNotifications.doc(id));
         allNotifications[id].status = notificationStatus.PROCESSING;
       });
 
@@ -91,112 +102,206 @@ class NotificationService {
         batch.update(ref, { status: notificationStatus.PROCESSING });
       });
 
-      batch.update(allDataList.doc("AllNotifications"), {
-        ...allNotifications,
-      });
+      batch.update(
+        allDataList.doc(dbCollectionDocName.ALL_NEW_TOUR_NOTIFICATIONS),
+        {
+          ...allNotifications,
+        }
+      );
 
       await batch.commit();
 
       const tours = await this.getTourDetails(tourIds);
-      await this.sendGroupedNotification(tours);
+      await this.sendGroupedNewNotification(tours);
     } catch (err) {
-      error(`Failed check pending notifications: ${err}`);
+      error(`Failed check pending NEW notifications: ${err}`);
     }
   }
 
-  // static async checkPendingNotifications() {
-  //   const now = admin.firestore.Timestamp.now();
-  //   const threshold = new admin.firestore.Timestamp(
-  //     now.seconds + 300, // 5分钟时间窗口
-  //     now.nanoseconds
-  //   );
+  static async checkPendingEndNotifications() {
+    const now = admin.firestore.Timestamp.now();
+    const threshold = new admin.firestore.Timestamp(
+      now.seconds + 300,
+      now.nanoseconds
+    );
 
-  //   // 1. search pending notifications
-  //   const notifications = await scheduleNotifications
-  //     .where("status", "==", notificationStatus.PENDING)
-  //     .where("executeAt", "<=", threshold)
-  //     .limit(100) // 防止超量
-  //     .get();
+    try {
+      const allNotificationsDoc = await allDataList
+        .doc(dbCollectionDocName.ALL_END_TOUR_NOTIFICATIONS)
+        .get();
 
-  //   if (notifications.empty) {
-  //     console.log("No pending notifications");
-  //     return;
-  //   }
+      if (!allNotificationsDoc.exists) {
+        error("AllEndTourNotifications document does not exist!");
+        return;
+      }
 
-  //   // 2. send notifications and update status
-  //   const batch = db.batch();
-  //   const tourIds = [];
+      const allNotifications = allNotificationsDoc.data() || {};
 
-  //   notifications.docs.forEach((doc) => {
-  //     const { tourId } = doc.data();
-  //     tourIds.push(tourId);
-  //     batch.update(doc.ref, { status: notificationStatus.PROCESSING });
-  //   });
+      const pendingNotifications = Object.entries(allNotifications)
+        .filter(
+          ([id, notification]) =>
+            notification.status == notificationStatus.PENDING &&
+            notification.executeAt <= threshold
+        )
+        .slice(0, LIMIT_SENDING_NOTIFICATIONS);
 
-  //   await batch.commit();
+      if (pendingNotifications.length == 0) {
+        log("No pending END notifications");
+        return;
+      }
 
-  //   // 3. get valid tours and send via grouped info
-  //   const tours = await this.getTourDetails(tourIds);
-  //   await this.sendGroupedNotification(tours);
-  // }
+      const tourIds = [];
+      const scheduleNotificationRefs = [];
 
-  static async getTourDetails(tourIds) {
-    const snapshot = await db
-      .collection("DogTours")
-      .where(admin.firestore.FieldPath.documentId(), "in", tourIds)
-      .get();
-    return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      pendingNotifications.forEach(([id, notification]) => {
+        tourIds.push(notification.tourId);
+        scheduleNotificationRefs.push(ScheduledEndTourNotifications.doc(id));
+        allNotifications[id].status = notificationStatus.PROCESSING;
+      });
+
+      const batch = db.batch();
+
+      scheduleNotificationRefs.forEach((ref) => {
+        batch.update(ref, { status: notificationStatus.PROCESSING });
+      });
+
+      batch.update(
+        allDataList.doc(dbCollectionDocName.ALL_END_TOUR_NOTIFICATIONS),
+        {
+          ...allNotifications,
+        }
+      );
+
+      await batch.commit();
+
+      const tours = await this.getTourDetails(tourIds);
+      await this.sendGroupedEndNotification(tours);
+    } catch (err) {
+      error(`Failed check pending END notifications: ${err}`);
+    }
   }
 
-  static async sendGroupedNotification(tours) {
+  static async getTourDetails(tourIds) {
+    if (!tourIds?.length) return [];
+
+    const allTours = await allDataList.doc(dbCollectionDocName.ALL_TOURS).get();
+
+    if (!allTours.exists) {
+      log("AllTours document does not exist!");
+      return [];
+    }
+
+    const allToursData = allTours.data() || {};
+
+    const targetTours = Object.entries(allToursData)
+      .filter(([id, tourData]) =>
+        tourIds.some(
+          (tourId) => tourId == id || tourId.toString() == id.toString()
+        )
+      )
+      .map(([id, tourData]) => ({
+        ...tourData,
+        id,
+      }));
+
+    return targetTours;
+  }
+
+  static async sendGroupedNewNotification(tours) {
     if (tours.length === 0) return;
+
+    const tourIds = tours.map((t) => t.id);
 
     // send to all ADMIN
     await this.sendInstantNotification(`您有 ${tours.length} 个行程即将开始`, {
       type: "tour_reminder",
-      tourIds: JSON.stringify(tours.map((t) => t.id)),
+      tourIds: JSON.stringify(tourIds),
     });
 
-    const allNotificationsRef = allDataList.doc("AllNotifications");
-    const updates = {};
-
-    tours.forEach((tour) => {
-      updates[`${tour.id}.status`] = notificationStatus.COMPLETED;
-      updates[`${tour.id}.completedAt`] =
-        admin.firestore.FieldValue.serverTimestamp();
-    });
-
-    await allNotificationsRef.update(updates);
+    await this.completeTourNotification(tourIds);
   }
 
-  // static async sendGroupedNotification(tours) {
-  //   if (tours.length === 0) return;
+  static async sendGroupedEndNotification(tours) {
+    if (tours.length === 0) return;
 
-  //   // send to all ADMIN
-  //   await this.sendInstantNotification(`您有 ${tours.length} 个行程即将开始`, {
-  //     type: "tour_reminder",
-  //     tourIds: JSON.stringify(tours.map((t) => t.id)),
-  //   });
+    const tourIds = tours.map((t) => t.id);
 
-  //   // mark notification status as "completed"
-  //   const notifications = await scheduleNotifications
-  //     .where(
-  //       "tourId",
-  //       "in",
-  //       tours.map((t) => t.id)
-  //     )
-  //     .where("status", "==", notificationStatus.PROCESSING)
-  //     .get();
+    // send to all ADMIN
+    await this.sendInstantNotification(`您有 ${tours.length} 个行程即将结束`, {
+      type: "tour_reminder",
+      tourIds: JSON.stringify(tourIds),
+    });
 
-  //   notifications.docs.forEach((doc) => {
-  //     batch.update(doc.ref, {
-  //       status: notificationStatus.COMPLETED,
-  //       completedAt: admin.firestore.FieldValue.serverTimestamp(),
-  //     });
-  //   });
+    await this.completeTourNotification(tourIds);
+  }
 
-  //   await batch.commit();
-  // }
+  static async completeTourNotification(tourIds) {
+    if (!tourIds?.length) return;
+
+    const _getCollection = () => {
+      const hours = new Date().getHours();
+
+      return hours < 12
+        ? ScheduledNewTourNotifications
+        : ScheduledEndTourNotifications;
+    };
+
+    const _getDocName = () => {
+      const hours = new Date().getHours();
+      return hours < 12
+        ? dbCollectionDocName.ALL_NEW_TOUR_NOTIFICATIONS
+        : dbCollectionDocName.ALL_END_TOUR_NOTIFICATIONS;
+    };
+
+    try {
+      const batch = db.batch();
+      const now = admin.firestore.FieldValue.serverTimestamp();
+
+      const collectionRef = _getCollection();
+      const collectionDocName = _getDocName();
+
+      const snapshot = await collectionRef
+        .where("tourId", "in", tourIds)
+        .where("status", "==", notificationStatus.PROCESSING)
+        .get();
+
+      if (snapshot.empty) {
+        log("No notifications to complete");
+        return;
+      }
+
+      const baseCompletedData = {
+        status: notificationStatus.COMPLETED,
+        completedAt: now,
+        lastUpdated: now,
+      };
+
+      const summaryRef = allDataList.doc(collectionDocName);
+      const processedTours = new Set();
+
+      snapshot.docs.forEach((doc) => {
+        const tourId = doc.data().tourId;
+
+        if (processedTours.has(tourId)) return;
+
+        const completedData = {
+          ...doc.data(),
+          ...baseCompletedData,
+        };
+
+        batch.update(doc.ref, completedData);
+        batch.update(summaryRef, {
+          [doc.id]: completedData,
+        });
+
+        processedTours.add(tourId);
+      });
+
+      await batch.commit();
+    } catch (err) {
+      error("Failed change notification status to COMPLETE: ", err);
+    }
+  }
 }
 
 module.exports = NotificationService;

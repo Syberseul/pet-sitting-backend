@@ -3,12 +3,19 @@ const admin = require("firebase-admin");
 const { db } = require("./index");
 const { notificationStatus } = require("./enums");
 const {
-  getNotificationTime,
+  getNewNotificationTime,
+  getEndNotificationTime,
   isValidDateSendingNotification,
 } = require("../utils/utilFunctions");
+const { dbCollectionName, dbCollectionDocName } = require("./enums/dbEnum");
 
-const scheduleNotifications = db.collection("scheduleNotifications");
-const allDataList = db.collection("List");
+const ScheduledNewTourNotifications = db.collection(
+  dbCollectionName.NEW_TOUR_NOTIFICATIONS
+);
+const ScheduledEndTourNotifications = db.collection(
+  dbCollectionName.END_TOUR_NOTIFICATIONS
+);
+const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
 
 class NotificationService {
   static async scheduleTourNotification(tourData) {
@@ -18,29 +25,53 @@ class NotificationService {
     if (!isValidDateSendingNotification(tourData.startDate, tourData.endDate))
       return;
 
-    const notificationTime = getNotificationTime(tourData.startDate);
-
-    const notificationRef = scheduleNotifications.doc();
-
-    if (!tourData.uid) return;
-
     try {
-      const notificationData = {
+      const newNotificationTime = getNewNotificationTime(tourData.startDate);
+      const endNotificationTime = getEndNotificationTime(tourData.endDate);
+      const batch = db.batch();
+
+      // create notification doc reference
+      const newNotificationRef = ScheduledNewTourNotifications.doc();
+      const endNotificationRef = ScheduledEndTourNotifications.doc();
+
+      // prepare notification data
+      const baseNotificationData = {
         tourId: tourData.uid,
         status: notificationStatus.PENDING,
-        userId: null, // in the future maybe needed to determine which type of user would receive such notifications
-        executeAt: admin.firestore.Timestamp.fromDate(notificationTime),
+        userId: null,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       };
+      const newNotificationData = {
+        ...baseNotificationData,
+        executeAt: admin.firestore.Timestamp.fromDate(newNotificationTime),
+        uid: newNotificationRef.id,
+      };
+      const endNotificationData = {
+        ...baseNotificationData,
+        executeAt: admin.firestore.Timestamp.fromDate(endNotificationTime),
+        uid: endNotificationRef.id,
+      };
 
-      await notificationRef.set(notificationData);
+      // create notification directly to relevant document
+      batch.set(newNotificationRef, newNotificationData);
+      batch.set(endNotificationRef, endNotificationData);
 
-      const AllNotificationsRef = allDataList.doc("AllNotifications") || [];
-      const notificationId = notificationRef.id;
+      const AllNewNotificationsRef = allDataList.doc(
+        dbCollectionDocName.ALL_NEW_TOUR_NOTIFICATIONS
+      );
+      const AllEndNotificationsRef = allDataList.doc(
+        dbCollectionDocName.ALL_END_TOUR_NOTIFICATIONS
+      );
 
-      await AllNotificationsRef.update({
-        [notificationId]: { ...notificationData, uid: notificationId },
+      // create notification to all-in-one document
+      batch.set(AllNewNotificationsRef, {
+        [newNotificationRef.id]: newNotificationData,
       });
+      batch.set(AllEndNotificationsRef, {
+        [endNotificationRef.id]: endNotificationData,
+      });
+
+      await batch.commit();
     } catch (err) {
       console.log(err);
     }
@@ -60,73 +91,138 @@ class NotificationService {
       return;
 
     try {
-      const snapshot = await scheduleNotifications
-        .where("tourId", "==", tourId)
-        .where("status", "in", [
-          notificationStatus.PENDING,
-          notificationStatus.CANCELLED,
-        ])
-        .limit(1)
-        .get();
+      const newNotificationTime = getNewNotificationTime(newTourData.startDate);
+      const endNotificationTime = getEndNotificationTime(newTourData.endDate);
+      const batch = db.batch();
 
-      if (snapshot.empty) {
+      const [newNotificationSnapshot, endNotificationSnapshot] =
+        await Promise.all([
+          ScheduledNewTourNotifications.where("tourId", "==", tourId)
+            .where("status", "in", [
+              notificationStatus.PENDING,
+              notificationStatus.CANCELLED,
+            ])
+            .limit(1)
+            .get(),
+          ScheduledEndTourNotifications.where("tourId", "==", tourId)
+            .where("status", "in", [
+              notificationStatus.PENDING,
+              notificationStatus.CANCELLED,
+            ])
+            .limit(1)
+            .get(),
+        ]);
+
+      const baseUpdatedNotificationData = {
+        status: notificationStatus.PENDING,
+        lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
+      };
+
+      if (newNotificationSnapshot.empty && endNotificationSnapshot.empty)
         return this.scheduleTourNotification(newTourData);
-      } else {
-        const notificationTime = getNotificationTime(newTourData.startDate);
 
-        const updatedData = {
-          ...snapshot.docs[0].data(),
-          executeAt: admin.firestore.Timestamp.fromDate(notificationTime),
-          lastUpdated: admin.firestore.FieldValue.serverTimestamp(),
-          status: notificationStatus.PENDING,
+      if (!newNotificationSnapshot.empty) {
+        const newNotificationDoc = newNotificationSnapshot.docs[0];
+        const updatedNewNotificationData = {
+          ...newNotificationDoc.data(),
+          ...baseUpdatedNotificationData,
+          executeAt: admin.firestore.Timestamp.fromDate(newNotificationTime),
         };
-
-        await snapshot.docs[0].ref.update(updatedData);
-
-        await allDataList.doc("AllNotifications").update({
-          [snapshot.docs[0].id]: updatedData,
-        });
+        // update new notification to its relevant document
+        batch.update(newNotificationDoc.ref, updatedNewNotificationData);
+        // update new notification to all-in-one document
+        batch.update(
+          allDataList.doc(dbCollectionDocName.ALL_NEW_TOUR_NOTIFICATIONS),
+          {
+            [newNotificationDoc.id]: updatedNewNotificationData,
+          }
+        );
       }
+
+      if (!endNotificationSnapshot.empty) {
+        const endNotificationDoc = endNotificationSnapshot.docs[0];
+        const updatedEndNotificationData = {
+          ...endNotificationDoc.data(),
+          ...baseUpdatedNotificationData,
+          executeAt: admin.firestore.Timestamp.fromDate(endNotificationTime),
+        };
+        // update end notification to its relevant document
+        batch.update(endNotificationDoc.ref, updatedEndNotificationData);
+        // update end notification to all-in-one document
+        batch.update(
+          allDataList.doc(dbCollectionDocName.ALL_END_TOUR_NOTIFICATIONS),
+          {
+            [endNotificationDoc.id]: updatedEndNotificationData,
+          }
+        );
+      }
+
+      await batch.commit();
     } catch (err) {
       console.log(err);
     }
   }
 
   static async cancelTourNotification(tourId) {
-    try {
-      const snapshot = await scheduleNotifications
-        .where("tourId", "==", tourId)
-        .where("status", "in", [
-          notificationStatus.PENDING,
-          notificationStatus.PROCESSING,
-        ])
-        .limit(1)
-        .get();
+    if (!tourId) return;
 
-      if (snapshot.empty) {
-        console.log("No active notifications found for tourId: ", tourId);
+    try {
+      const now = admin.firestore.FieldValue.serverTimestamp();
+      const batch = db.batch();
+
+      const [newNotificationSnapshot, endNotificationSnapshot] =
+        await Promise.all([
+          ScheduledNewTourNotifications.where("tourId", "==", tourId)
+            .where("status", "in", [
+              notificationStatus.PENDING,
+              notificationStatus.PROCESSING,
+            ])
+            .limit(1)
+            .get(),
+          ScheduledEndTourNotifications.where("tourId", "==", tourId)
+            .where("status", "in", [
+              notificationStatus.PENDING,
+              notificationStatus.PROCESSING,
+            ])
+            .limit(1)
+            .get(),
+        ]);
+
+      const allDocsToCancel = [
+        ...newNotificationSnapshot.docs,
+        ...endNotificationSnapshot.docs,
+      ];
+
+      if (allDocsToCancel.length == 0) {
+        console.log(`No active notifications found for tour: ${tourId}`);
         return;
       }
 
-      const notificationDoc = snapshot.docs[0];
-      const notificationId = notificationDoc.id;
-
-      const batch = db.batch();
-
-      batch.update(notificationDoc.ref, {
-        ...notificationDoc.data(),
+      const baseCancelledNotificationData = {
         status: notificationStatus.CANCELLED,
-        cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+        lastUpdated: now,
+        cancelledAt: now,
+      };
 
-      const AllNotificationsRef = allDataList.doc("AllNotifications");
+      allDocsToCancel.forEach((doc) => {
+        const collectionName = doc.ref.parent.id;
+        const summaryDocRef = allDataList.doc(
+          collectionName == dbCollectionName.NEW_TOUR_NOTIFICATIONS
+            ? dbCollectionDocName.ALL_NEW_TOUR_NOTIFICATIONS
+            : dbCollectionDocName.ALL_END_TOUR_NOTIFICATIONS
+        );
 
-      batch.update(AllNotificationsRef, {
-        [notificationId]: {
-          ...notificationDoc.data(),
-          status: notificationStatus.CANCELLED,
-          cancelledAt: admin.firestore.FieldValue.serverTimestamp(),
-        },
+        const cancelledNotificationData = {
+          ...doc.data(),
+          ...baseCancelledNotificationData,
+        };
+
+        // cancel notification to its relevant document
+        batch.update(doc.ref, cancelledNotificationData);
+        // cancel notification to its related all-in-one document
+        batch.update(summaryDocRef, {
+          [doc.id]: cancelledNotificationData,
+        });
       });
 
       await batch.commit();

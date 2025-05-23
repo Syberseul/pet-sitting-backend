@@ -31,16 +31,37 @@ exports.isValidDateSendingNotification = (startDate, endDate) => {
   const startStr = this.getFormattedDate(startDate).split("T")[0];
   const endStr = this.getFormattedDate(endDate).split("T")[0];
 
-  const isStartAfterToday = startStr >= todayStr;
+  const isStartAfterToday = startStr > todayStr;
   const isEndValid = endStr >= startStr;
 
   return isStartAfterToday && isEndValid;
 };
 
-exports.getNotificationTime = (dateTime) => {
+exports.getNewNotificationTime = (dateTime) => {
+  // set notification time the day before dateTime at 7PM
   const reminderTime = new Date(dateTime);
   reminderTime.setDate(reminderTime.getDate() - 1);
   reminderTime.setHours(19, 0, 0, 0);
+
+  // // test
+  // const reminderTime = new Date();
+  // reminderTime.setMinutes(reminderTime.getMinutes() + 1);
+
+  const formattedDate = format(reminderTime, "yyyy-MM-dd HH:mm:ss", {
+    timeZone: "Australia/Melbourne",
+  });
+
+  return new Date(formattedDate);
+};
+
+exports.getEndNotificationTime = (dateTime) => {
+  // set notification time same as dateTime at 7AM
+  const reminderTime = new Date(dateTime);
+  reminderTime.setHours(7, 0, 0, 0);
+
+  // // test
+  // const reminderTime = new Date();
+  // reminderTime.setMinutes(reminderTime.getMinutes() + 1);
 
   const formattedDate = format(reminderTime, "yyyy-MM-dd HH:mm:ss", {
     timeZone: "Australia/Melbourne",

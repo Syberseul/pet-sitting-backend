@@ -6,10 +6,16 @@ const { interError } = require("../utils/utilFunctions");
 
 const NotificationService = require("../Server/notificationService");
 
-const admin = require("firebase-admin");
+// const ServerNotificationService = require("../../functions/Service/notificationService");
 
-const tourCollection = db.collection("DogTours");
-const allDataList = db.collection("List");
+const admin = require("firebase-admin");
+const {
+  dbCollectionName,
+  dbCollectionDocName,
+} = require("../Server/enums/dbEnum");
+
+const tourCollection = db.collection(dbCollectionName.DOG_TOUR);
+const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
 
 exports.createTour = async (req, res) => {
   const { dogId, ownerId } = req.body;
@@ -30,13 +36,15 @@ exports.createTour = async (req, res) => {
 
     await tourListRef.set(savedTour);
 
-    const allToursRef = allDataList.doc("AllTours");
+    const allToursRef = allDataList.doc(dbCollectionDocName.ALL_TOURS);
 
     await allToursRef.update({
       [tourListId]: savedTour,
     });
 
     await NotificationService.scheduleTourNotification(savedTour);
+
+    // await ServerNotificationService.checkPendingNewNotifications();
 
     return res.status(201).json({
       data: savedTour,
@@ -76,7 +84,7 @@ exports.updateTour = async (req, res) => {
 
     await tourRef.update(data);
 
-    await allDataList.doc("AllTours").update({
+    await allDataList.doc(dbCollectionDocName.ALL_TOURS).update({
       [id]: data,
     });
 
@@ -107,7 +115,7 @@ exports.removeTour = async (req, res) => {
     await tourRef.delete();
 
     await allDataList
-      .doc("AllTours")
+      .doc(dbCollectionDocName.ALL_TOURS)
       .update({ [id]: admin.firestore.FieldValue.delete() });
 
     await NotificationService.cancelTourNotification(id);
@@ -123,7 +131,7 @@ exports.removeTour = async (req, res) => {
 
 exports.getAllTours = async (req, res) => {
   try {
-    const allTours = await allDataList.doc("AllTours").get();
+    const allTours = await allDataList.doc(dbCollectionDocName.ALL_TOURS).get();
 
     if (!allTours.exists)
       return res.status(404).json({

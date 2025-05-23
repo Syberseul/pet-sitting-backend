@@ -1,10 +1,3 @@
-const notificationStatus = Object.freeze({
-  PENDING: "pending",
-  PROCESSING: "processing",
-  COMPLETED: "completed",
-  CANCELLED: "cancelled",
-});
-
 const dbCollectionName = Object.freeze({
   NEW_TOUR_NOTIFICATIONS: "ScheduledNewTourNotifications",
   END_TOUR_NOTIFICATIONS: "ScheduledEndTourNotifications",
@@ -21,4 +14,4 @@ const dbCollectionDocName = Object.freeze({
   ALL_DOG_OWNERS: "AllDogOwners",
 });
 
-module.exports = { notificationStatus, dbCollectionName, dbCollectionDocName };
+module.exports = { dbCollectionName, dbCollectionDocName };

@@ -1,5 +1,6 @@
 const { UserRole } = require("../../enum");
 const { db, auth } = require("../../Server");
+const { dbCollectionName } = require("../../Server/enums/dbEnum");
 
 module.exports.modifyDogs = async (req, res, next) => {
   const authHeader = req.headers.authorization;
@@ -8,7 +9,7 @@ module.exports.modifyDogs = async (req, res, next) => {
   if (!token) return res.status(401).json({ error: "Unauthorized" });
 
   try {
-    const userRef = db.collection("User");
+    const userRef = db.collection(dbCollectionName.USER);
     const snapshot = await userRef.where("token", "==", token).limit(1).get();
 
     if (snapshot.empty) return res.status(403).json({ error: "Access denied" });
