@@ -1,5 +1,7 @@
 const { Platform } = require("../enum");
-const { format } = require("date-fns-tz");
+const { format, fromZonedTime, toZonedTime } = require("date-fns-tz");
+
+const TIMEZONE = "Australia/Melbourne";
 
 exports.interError = (res, err) =>
   res.status(500).json({
@@ -16,12 +18,14 @@ exports.missingWxProperty = (res) =>
   });
 
 exports.getFormattedDate = (date = new Date()) => {
-  const dateTime = new Date(date);
-  const year = dateTime.getFullYear();
-  const month = (dateTime.getMonth() + 1).toString().padStart(2, "0");
-  const day = dateTime.getDate().toString().padStart(2, "0");
+  // const dateTime = new Date(date);
+  // const year = dateTime.getFullYear();
+  // const month = (dateTime.getMonth() + 1).toString().padStart(2, "0");
+  // const day = dateTime.getDate().toString().padStart(2, "0");
 
-  return `${year}-${month}-${day}T00:00:00`;
+  // return `${year}-${month}-${day}T00:00:00`;
+  const zonedTime = toZonedTime(new Date(date), TIMEZONE);
+  return format(zonedTime, "yyyy-MM-dd'T'00:00:00", { timeZone: TIMEZONE });
 };
 
 exports.isValidDateSendingNotification = (startDate, endDate) => {
@@ -38,8 +42,10 @@ exports.isValidDateSendingNotification = (startDate, endDate) => {
 };
 
 exports.getNewNotificationTime = (dateTime) => {
+  const zonedDate = toZonedTime(new Date(dateTime), TIMEZONE);
+
   // set notification time the day before dateTime at 7PM
-  const reminderTime = new Date(this.getFormattedDate(dateTime));
+  const reminderTime = new Date(zonedDate);
   reminderTime.setDate(reminderTime.getDate() - 1);
   reminderTime.setHours(19, 0, 0, 0);
 
@@ -47,14 +53,20 @@ exports.getNewNotificationTime = (dateTime) => {
   // const reminderTime = new Date();
   // reminderTime.setMinutes(reminderTime.getMinutes() + 1);
 
-  const formattedDate = format(reminderTime, "yyyy-MM-dd HH:mm:ss", {
-    timeZone: "Australia/Melbourne",
-  });
+  // const formattedDate = format(reminderTime, "yyyy-MM-dd HH:mm:ss", {
+  //   timeZone: "Australia/Melbourne",
+  // });
 
-  return new Date(formattedDate);
+  // return new Date(formattedDate);
+  return fromZonedTime(
+    format(reminderTime, "yyyy-MM-dd HH:mm:ss", { timeZone: TIMEZONE }),
+    TIMEZONE
+  );
 };
 
 exports.getEndNotificationTime = (dateTime) => {
+  const zonedDate = toZonedTime(new Date(dateTime), TIMEZONE);
+
   // set notification time same as dateTime at 7AM
   const reminderTime = new Date(this.getFormattedDate(dateTime));
   reminderTime.setHours(7, 0, 0, 0);
@@ -63,9 +75,13 @@ exports.getEndNotificationTime = (dateTime) => {
   // const reminderTime = new Date();
   // reminderTime.setMinutes(reminderTime.getMinutes() + 1);
 
-  const formattedDate = format(reminderTime, "yyyy-MM-dd HH:mm:ss", {
-    timeZone: "Australia/Melbourne",
-  });
+  // const formattedDate = format(reminderTime, "yyyy-MM-dd HH:mm:ss", {
+  //   timeZone: "Australia/Melbourne",
+  // });
 
-  return new Date(formattedDate);
+  // return new Date(formattedDate);
+  return fromZonedTime(
+    format(reminderTime, "yyyy-MM-dd HH:mm:ss", { timeZone: TIMEZONE }),
+    TIMEZONE
+  );
 };
