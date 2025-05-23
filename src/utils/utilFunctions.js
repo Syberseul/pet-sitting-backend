@@ -39,7 +39,7 @@ exports.isValidDateSendingNotification = (startDate, endDate) => {
 
 exports.getNewNotificationTime = (dateTime) => {
   // set notification time the day before dateTime at 7PM
-  const reminderTime = new Date(dateTime);
+  const reminderTime = new Date(this.getFormattedDate(dateTime));
   reminderTime.setDate(reminderTime.getDate() - 1);
   reminderTime.setHours(19, 0, 0, 0);
 
@@ -56,7 +56,7 @@ exports.getNewNotificationTime = (dateTime) => {
 
 exports.getEndNotificationTime = (dateTime) => {
   // set notification time same as dateTime at 7AM
-  const reminderTime = new Date(dateTime);
+  const reminderTime = new Date(this.getFormattedDate(dateTime));
   reminderTime.setHours(7, 0, 0, 0);
 
   // // test
