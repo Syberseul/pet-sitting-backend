@@ -12,6 +12,8 @@ const { hashPwd, verifyPassword } = require("../utils/pwdUtils");
 
 const userCollection = db.collection(dbCollectionName.USER);
 
+const admin = require("firebase-admin");
+
 exports.register = async (req, res) => {
   try {
     const isWxPlatform = req.headers.platform == Platform.WX;
@@ -61,13 +63,13 @@ exports.register = async (req, res) => {
       }
     }
 
-    // custom token for wxMiniProject
-    const customToken = await auth.createCustomToken(userRecord.uid);
+    const firebaseCustomToken = await auth.createCustomToken(userRecord.uid);
 
-    const { shortToken, longToken } = await createToken();
+    const { longToken } = await createToken();
 
     const userRef = userCollection.doc(userRecord.uid);
 
+    // NO NEED to save firebaseCustomToken into db, as it requires frontend to call firebase.auth().signInWithCustomToken(firebaseCustomToken) to get actual token
     const userData = {
       ...DefaultUserInfo,
       id: userRecord.uid,
@@ -77,10 +79,15 @@ exports.register = async (req, res) => {
       googleId: googleId || "",
       githubId: githubId || "",
       isFromWx: isWxPlatform,
-      token: shortToken,
+      // token: firebaseCustomToken,
       refreshToken: longToken,
       lastLogin: new Date().getTime(),
     };
+
+    // use Custom Claims to save USER ROLE to firebase
+    await admin.auth().setCustomUserClaims(userRecord.uid, {
+      role: UserRole.VISITOR
+    })
 
     if (isEmailAuth) userData.password = hashPwd(password);
 
@@ -90,10 +97,9 @@ exports.register = async (req, res) => {
       uid: userRecord.uid,
       email: userRecord.email,
       userName,
-      token: shortToken,
+      token: firebaseCustomToken,
       refreshToken: longToken,
       role: UserRole.VISITOR,
-      customToken,
     });
   } catch (error) {
     return res.status(500).json({
@@ -184,26 +190,28 @@ exports.login = async (req, res) => {
       if (!fcmTokens.includes(fcmToken)) fcmTokens.push(fcmToken);
     }
 
-    // custom token for wxMiniProject
-    const customToken = await auth.createCustomToken(userDoc.id);
+    const firebaseCustomToken = await auth.createCustomToken(userDoc.id);
 
-    const { shortToken, longToken } = await createToken();
+    const { longToken } = await createToken(userData);
 
+    // NO NEED to update firebaseCustomToken
     await userDoc.ref.update({
-      token: shortToken,
+      // token: firebaseCustomToken,
       refreshToken: longToken,
       lastLogin: new Date(),
       fcmTokens: fcmTokens,
     });
 
+    const role = userData.role || UserRole.VISITOR;
+    await admin.auth().setCustomUserClaims(userDoc.id, {role});
+
     return res.status(200).json({
       uid: userDoc.id,
       email: userData.email,
       userName: userData.userName,
-      token: shortToken,
+      token: firebaseCustomToken,
       refreshToken: longToken,
-      role: userData.role || UserRole.VISITOR,
-      customToken,
+      role,
     });
   } catch (error) {
     console.error("Login Error:", error);
@@ -285,16 +293,18 @@ exports.refreshToken = async (req, res) => {
         code: 403,
       });
 
-    const { shortToken, longToken } = await createToken();
+    const firebaseCustomToken = await auth.createCustomToken(userRecord.uid);
+    
+    const { longToken } = await createToken();
 
     await userDoc.ref.update({
-      token: shortToken,
+      uid,
       refreshToken: longToken,
       lastLogin: new Date(),
     });
 
     res.status(200).json({
-      token: shortToken,
+      token: firebaseCustomToken,
       refreshToken: longToken,
       uid,
     });

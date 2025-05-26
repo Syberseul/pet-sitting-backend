@@ -1,4 +1,5 @@
 const { UserRole } = require("../../enum");
+const admin = require("firebase-admin");
 const { db, auth } = require("../../Server");
 const { dbCollectionName } = require("../../Server/enums/dbEnum");
 
@@ -9,19 +10,21 @@ module.exports.modifyDogs = async (req, res, next) => {
   if (!token) return res.status(401).json({ error: "Unauthorized" });
 
   try {
-    const userRef = db.collection(dbCollectionName.USER);
-    const snapshot = await userRef.where("token", "==", token).limit(1).get();
+    // const userRef = db.collection(dbCollectionName.USER);
+    // const snapshot = await userRef.where("token", "==", token).limit(1).get();
+    const decodedToken = await admin.auth().verifyIdToken(token);
+    const userRole = decodedToken.role || UserRole.VISITOR;
 
-    if (snapshot.empty) return res.status(403).json({ error: "Access denied" });
+    // if (snapshot.empty) return res.status(403).json({ error: "Access denied" });
 
-    const { role } = snapshot.docs[0].data();
+    // const { role } = snapshot.docs[0].data();
 
-    if (role == UserRole.VISITOR) {
+    if (userRole == UserRole.VISITOR) {
       return res.status(403).json({ error: "Access denied" });
-    } else if (role == UserRole.ADMIN || role == UserRole.DEVELOPER) {
+    } else if (userRole == UserRole.ADMIN || role == UserRole.DEVELOPER) {
       next();
       return;
-    } else if (role == UserRole.DOG_OWNER) {
+    } else if (userRole == UserRole.DOG_OWNER) {
       // TODO: check owners dog list and return 403 if dog id that trying to modify is not belong to this owner
       next();
       return;
