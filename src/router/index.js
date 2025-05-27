@@ -8,12 +8,15 @@ const tourRouter = require("./tourRouter");
 
 const { verifyToken } = require("../utils/jwt");
 
-const { modifyDogs } = require("../middleware/validator/checkPermission");
+const {
+  modifyDogs,
+  modifyTours,
+} = require("../middleware/validator/checkPermission");
 
 router.use("/users", userRouter);
 router.use("/owner", verifyToken, dogOwnerRouter);
 router.use("/dogs", verifyToken, modifyDogs, dogRouter);
-router.use("/tour", verifyToken, tourRouter);
+router.use("/tour", verifyToken, modifyTours, tourRouter);
 
 const wxValidationContent = "80954e3d9f517a44a6173939ffa17a55";
 router.get("/Q3aVw9J6cN.txt", (req, res) => {

@@ -86,8 +86,8 @@ exports.register = async (req, res) => {
 
     // use Custom Claims to save USER ROLE to firebase
     await admin.auth().setCustomUserClaims(userRecord.uid, {
-      role: UserRole.VISITOR
-    })
+      role: UserRole.VISITOR,
+    });
 
     if (isEmailAuth) userData.password = hashPwd(password);
 
@@ -192,7 +192,11 @@ exports.login = async (req, res) => {
 
     const firebaseCustomToken = await auth.createCustomToken(userDoc.id);
 
-    const { longToken } = await createToken(userData);
+    const tokenUserData = userData;
+    delete tokenUserData.token;
+    delete tokenUserData.refreshToken;
+
+    const { longToken } = await createToken(tokenUserData);
 
     // NO NEED to update firebaseCustomToken
     await userDoc.ref.update({
@@ -203,7 +207,7 @@ exports.login = async (req, res) => {
     });
 
     const role = userData.role || UserRole.VISITOR;
-    await admin.auth().setCustomUserClaims(userDoc.id, {role});
+    await admin.auth().setCustomUserClaims(userDoc.id, { role });
 
     return res.status(200).json({
       uid: userDoc.id,
@@ -293,8 +297,8 @@ exports.refreshToken = async (req, res) => {
         code: 403,
       });
 
-    const firebaseCustomToken = await auth.createCustomToken(userRecord.uid);
-    
+    const firebaseCustomToken = await auth.createCustomToken(userDoc.id);
+
     const { longToken } = await createToken();
 
     await userDoc.ref.update({

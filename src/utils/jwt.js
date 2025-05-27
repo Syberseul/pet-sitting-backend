@@ -38,7 +38,7 @@ module.exports.verifyToken = async (req, res, next) => {
     req.user = {
       uid: decoded.uid,
       role: decoded.role || UserRole.VISITOR,
-      isTokenFresh: true
+      isTokenFresh: true,
     };
 
     next();

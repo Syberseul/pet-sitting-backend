@@ -3,36 +3,66 @@ const admin = require("firebase-admin");
 const { db, auth } = require("../../Server");
 const { dbCollectionName } = require("../../Server/enums/dbEnum");
 
-module.exports.modifyDogs = async (req, res, next) => {
-  const authHeader = req.headers.authorization;
-  const token = authHeader ? authHeader.split("Bearer ")[1] : null;
+const modifyRule = (options = { allowedRoles: [], customCheck: null }) => {
+  return async (req, res, next) => {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.split("Bearer ")[1];
 
-  if (!token) return res.status(401).json({ error: "Unauthorized" });
+    if (!token) return res.status(401).json({ error: "Unauthorized" });
 
-  try {
-    // const userRef = db.collection(dbCollectionName.USER);
-    // const snapshot = await userRef.where("token", "==", token).limit(1).get();
-    const decodedToken = await admin.auth().verifyIdToken(token);
-    const userRole = decodedToken.role || UserRole.VISITOR;
+    try {
+      const decodedToken = await admin.auth().verifyIdToken(token);
+      const userRole = decodedToken.role || UserRole.VISITOR;
 
-    // if (snapshot.empty) return res.status(403).json({ error: "Access denied" });
+      if (
+        options.allowedRoles?.length &&
+        !options.allowedRoles.includes(userRole)
+      )
+        return res.status(403).json({ error: "Access denied" });
 
-    // const { role } = snapshot.docs[0].data();
+      if (options.customCheck) {
+        const customCheckResult = await options.customCheck({
+          req,
+          userRole,
+          userId: decodedToken.uid,
+        });
+        if (!customCheckResult) {
+          return res.status(403).json({ error: "Access denied" });
+        }
+      }
 
-    if (userRole == UserRole.VISITOR) {
-      return res.status(403).json({ error: "Access denied" });
-    } else if (userRole == UserRole.ADMIN || role == UserRole.DEVELOPER) {
+      req.user = {
+        uid: decodedToken.uid,
+        role: userRole,
+      };
       next();
-      return;
-    } else if (userRole == UserRole.DOG_OWNER) {
-      // TODO: check owners dog list and return 403 if dog id that trying to modify is not belong to this owner
-      next();
-      return;
-    } else return res.status(403).json({ error: "Access denied" });
-  } catch (err) {
-    if (err.message && err.message === "jwt expired") {
-      return res.status(401).json({ error: "Token expired" });
+    } catch (error) {
+      if (error.code === "auth/id-token-expired")
+        return res.status(401).json({ error: "Token expired" });
+
+      return res.status(500).json({ error: "Internal server error" });
     }
-    return res.status(500).json({ error: "Internal server error" });
-  }
+  };
 };
+
+module.exports.modifyDogs = modifyRule({
+  allowedRoles: [UserRole.DOG_OWNER, UserRole.DEVELOPER, UserRole.ADMIN],
+  customCheck: async (req, userId) => {
+    if (req.userRole != UserRole.DOG_OWNER) return true;
+    console.log("this is dog owner, need to check owner with dog's ownerId");
+    return true;
+  },
+});
+
+module.exports.modifyTours = modifyRule({
+  allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER],
+});
+
+module.exports.modifyOwners = modifyRule({
+  allowedRoles: [UserRole.DOG_OWNER, UserRole.DEVELOPER, UserRole.ADMIN],
+  customCheck: async (req, userId) => {
+    if (req.userRole != UserRole.DOG_OWNER) return true;
+    console.log("this is dog owner, suppose to return its own info");
+    return true;
+  },
+});
