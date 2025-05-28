@@ -137,7 +137,7 @@ exports.getAllTours = async (req, res) => {
     const userId = req.user?.uid || "";
 
     if (userRole == UserRole.VISITOR || !userId) {
-      res.status(402).json({ error: "Unauthorized" });
+      res.status(401).json({ error: "Unauthorized" });
       return;
     }
 

@@ -25,7 +25,7 @@ module.exports.verifyToken = async (req, res, next) => {
   const token = auth ? auth.split("Bearer ")[1] : null;
 
   if (!token) {
-    res.status(402).json({ error: "Unauthorized" });
+    res.status(401).json({ error: "Unauthorized" });
     return;
   }
 
@@ -51,6 +51,6 @@ module.exports.verifyToken = async (req, res, next) => {
     }
 
     console.error("Token verification error: ", err);
-    return res.status(402).json({ error: "Invalid token" });
+    return res.status(401).json({ error: "Invalid token" });
   }
 };
