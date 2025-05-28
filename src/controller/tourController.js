@@ -14,6 +14,8 @@ const {
   dbCollectionDocName,
 } = require("../Server/enums/dbEnum");
 
+const { UserRole } = require("../enum");
+
 const tourCollection = db.collection(dbCollectionName.DOG_TOUR);
 const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
 
@@ -131,6 +133,14 @@ exports.removeTour = async (req, res) => {
 
 exports.getAllTours = async (req, res) => {
   try {
+    const userRole = req.user?.role || UserRole.VISITOR;
+    const userId = req.user?.uid || "";
+
+    if (userRole == UserRole.VISITOR || !userId) {
+      res.status(402).json({ error: "Unauthorized" });
+      return;
+    }
+
     const allTours = await allDataList.doc(dbCollectionDocName.ALL_TOURS).get();
 
     if (!allTours.exists)
@@ -143,7 +153,12 @@ exports.getAllTours = async (req, res) => {
 
     const toursArray = Object.values(allToursData);
 
-    return res.status(200).json(toursArray);
+    const filteredTours =
+      userRole == UserRole.DOG_OWNER
+        ? filteredTours.filter((tour) => tour.ownerId === userId)
+        : toursArray;
+
+    return res.status(200).json(filteredTours);
   } catch (error) {
     return interError(res, error);
   }

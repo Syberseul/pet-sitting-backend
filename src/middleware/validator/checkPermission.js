@@ -45,24 +45,53 @@ const modifyRule = (options = { allowedRoles: [], customCheck: null }) => {
   };
 };
 
-module.exports.modifyDogs = modifyRule({
-  allowedRoles: [UserRole.DOG_OWNER, UserRole.DEVELOPER, UserRole.ADMIN],
-  customCheck: async (req, userId) => {
-    if (req.userRole != UserRole.DOG_OWNER) return true;
-    console.log("this is dog owner, need to check owner with dog's ownerId");
-    return true;
+// Owner Permissions
+module.exports.checkGetOwnerById = modifyRule({
+  allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER, UserRole.DOG_OWNER],
+  customCheck: async ({ req, userRole, userId }) => {
+    if (userRole != UserRole.DOG_OWNER) return true;
+    const { id } = req.params;
+    return id && id === userId;
   },
 });
 
-module.exports.modifyTours = modifyRule({
+module.exports.checkGetAllOwners = modifyRule({
   allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER],
 });
 
-module.exports.modifyOwners = modifyRule({
-  allowedRoles: [UserRole.DOG_OWNER, UserRole.DEVELOPER, UserRole.ADMIN],
-  customCheck: async (req, userId) => {
-    if (req.userRole != UserRole.DOG_OWNER) return true;
-    console.log("this is dog owner, suppose to return its own info");
-    return true;
+module.exports.checkCreateOwner = modifyRule({
+  allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER, UserRole.VISITOR],
+});
+
+module.exports.checkUpdateOwner = modifyRule({
+  allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER, UserRole.DOG_OWNER],
+  customCheck: async ({ req, userRole, userId }) => {
+    if (userRole != UserRole.DOG_OWNER) return true;
+    const { id } = req.params;
+    return id && id === userId;
+  },
+});
+
+// Dogs Permissions
+module.exports.checkModifyDog = modifyRule({
+  allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER, UserRole.DOG_OWNER],
+  customCheck: async ({ req, userRole, userId }) => {
+    if (userRole != UserRole.DOG_OWNER) return true;
+    const { ownerId } = req.body;
+    return ownerId && ownerId === userId;
+  },
+});
+
+// Tours Permissions
+module.exports.checkGetAllTours = modifyRule({
+  allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER, UserRole.DOG_OWNER],
+});
+
+module.exports.checkModifyTour = modifyRule({
+  allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER, UserRole.DOG_OWNER],
+  customCheck: async ({ req, userRole, userId }) => {
+    if (userRole != UserRole.DOG_OWNER) return true;
+    const { ownerId } = req.body;
+    return ownerId && ownerId === userId;
   },
 });
