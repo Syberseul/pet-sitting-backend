@@ -1,5 +1,8 @@
 const { db } = require("../Server");
-const { dbCollectionName } = require("../Server/enums/dbEnum");
+const {
+  dbCollectionName,
+  dbCollectionDocName,
+} = require("../Server/enums/dbEnum");
 
 const { DogInfo } = require("../model/DogModel");
 
@@ -8,9 +11,11 @@ const { interError } = require("../utils/utilFunctions");
 const { v4: uuid } = require("uuid");
 
 const dogOwnerCollection = db.collection(dbCollectionName.DOG_OWNER);
+const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
+const allOwnerRef = allDataList.doc(dbCollectionDocName.ALL_DOG_OWNERS);
 
 exports.createDog = async (req, res) => {
-  const { ownerId, breedType, dogName, weight, alive } = req.body;
+  const { ownerId } = req.body;
 
   if (!ownerId)
     return res.status(400).json({
@@ -18,124 +23,132 @@ exports.createDog = async (req, res) => {
       code: 400,
     });
 
-  const ownerRef = dogOwnerCollection.doc(ownerId);
-
   try {
-    const doc = await ownerRef.get();
-
-    if (!doc.exists)
-      return res.status(401).json({
-        error: "Missing Owner info",
-        code: 400,
-      });
-
-    const dogs = doc.data().dogs;
-
     const dogInfo = {
       ...DogInfo,
+      ...req.body,
       uid: uuid(),
-      breedType,
-      dogName,
-      weight,
-      alive,
     };
 
-    const data = {
-      ...doc.data(),
-      dogs: [...dogs, dogInfo],
-    };
+    let updatedOwnerData;
 
-    await ownerRef.update(data);
+    await db.runTransaction(async (transaction) => {
+      const ownerDoc = await transaction.get(dogOwnerCollection.doc(ownerId));
+
+      if (!ownerDoc.exists) throw new Error("Owner not found");
+
+      const newDogs = [...ownerDoc.data().dogs, dogInfo];
+      updatedOwnerData = {
+        ...ownerDoc.data(),
+        dogs: newDogs,
+      };
+
+      transaction.update(dogOwnerCollection.doc(ownerId), { dogs: newDogs });
+      transaction.update(allOwnerRef, { [ownerId]: updatedOwnerData });
+    });
 
     return res.status(200).json({
-      data,
-      message: "Dog created",
+      data: updatedOwnerData,
+      message: "Dog created successfully",
     });
-  } catch (error) {
-    return interError(res, error);
+  } catch (err) {
+    if (err.message === "Owner not found")
+      return res.status(404).json({
+        error: "Owner not found",
+        code: 404,
+      });
+    return interError(res, err);
   }
 };
 
 exports.updateDog = async (req, res) => {
-  const { ownerId, breedType, dogName, weight, alive, uid } = req.body;
+  const { ownerId, uid } = req.body;
 
-  if (!ownerId)
+  if (!ownerId || !uid)
     return res.status(400).json({
-      error: "Missing owner ID",
+      error: "Missing required ID",
       code: 400,
     });
 
-  const ownerRef = dogOwnerCollection.doc(ownerId);
-
   try {
-    const doc = await ownerRef.get();
+    let updatedOwnerData;
 
-    if (!doc.exists)
-      return res.status(401).json({
-        error: "Missing Owner info",
-        code: 400,
-      });
+    await db.runTransaction(async (transaction) => {
+      const ownerDoc = await transaction.get(dogOwnerCollection.doc(ownerId));
 
-    const dogs = doc.data().dogs;
+      if (!ownerDoc.exists) throw new Error("Missing Owner info");
 
-    const data = {
-      ...doc.data(),
-      dogs: dogs.map((d) => {
+      const newDogs = ownerDoc.data().dogs.map((d) => {
         d.ownerId = ownerId;
-        if (d.uid != uid) return d;
+        if (d.uid !== uid) return d;
         return {
           ...d,
-          breedType,
-          dogName,
-          weight,
-          alive,
+          ...req.body,
+          uid,
         };
-      }),
-    };
+      });
+      updatedOwnerData = {
+        ...ownerDoc.data(),
+        dogs: newDogs,
+      };
 
-    await ownerRef.update(data);
+      transaction.update(dogOwnerCollection.doc(ownerId), {
+        dogs: newDogs,
+      });
+      transaction.update(allOwnerRef, { [ownerId]: updatedOwnerData });
+    });
 
     return res.status(200).json({
-      data,
-      message: "Dog updated",
+      data: updatedOwnerData,
+      message: "Dog updated successfully",
     });
-  } catch (error) {
-    return interError(res, error);
+  } catch (err) {
+    if (err.message === "Missing Owner info")
+      return res.status(404).json({
+        error: "Missing Owner info",
+        code: 404,
+      });
+    return interError(res, err);
   }
 };
 
 exports.removeDog = async (req, res) => {
   const { ownerId, uid } = req.body;
 
-  if (!ownerId)
+  if (!ownerId || !uid)
     return res.status(400).json({
-      error: "Missing owner ID",
+      error: "Missing required ID",
       code: 400,
     });
 
-  const ownerRef = dogOwnerCollection.doc(ownerId);
-
   try {
-    const doc = await ownerRef.get();
+    await db.runTransaction(async (transaction) => {
+      const ownerDoc = await transaction.get(dogOwnerCollection.doc(ownerId));
 
-    if (!doc.exists)
-      return res.status(401).json({
-        error: "Missing Owner info",
-        code: 400,
+      if (!ownerDoc.exists) throw new Error("Missing Owner info");
+
+      const filteredDogs = ownerDoc.data().dogs.filter((d) => d.uid !== uid);
+      const newData = {
+        ...ownerDoc.data(),
+        dogs: filteredDogs,
+      };
+
+      transaction.update(dogOwnerCollection.doc(ownerId), {
+        dogs: filteredDogs,
       });
-
-    const dogs = doc.data().dogs;
-
-    await ownerRef.update({
-      ...doc.data(),
-      dogs: dogs.filter((d) => d.uid != uid),
+      transaction.update(allOwnerRef, { [ownerId]: newData });
     });
 
     return res.status(200).json({
       data: { uid },
-      message: "Dog removed",
+      message: "Dog removed successfully",
     });
-  } catch (error) {
-    return interError(res, error);
+  } catch (err) {
+    if (err.message === "Missing Owner info")
+      return res.status(404).json({
+        error: "Missing Owner info",
+        code: 404,
+      });
+    return interError(res, err);
   }
 };
