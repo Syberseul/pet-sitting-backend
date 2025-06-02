@@ -38,7 +38,7 @@ const modifyRule = (options = { allowedRoles: [], customCheck: null }) => {
       next();
     } catch (error) {
       if (error.code === "auth/id-token-expired")
-        return res.status(401).json({ error: "Token expired" });
+        return res.status(401).json({ error: "Token has expired" });
 
       return res.status(500).json({ error: "Internal server error" });
     }
@@ -94,4 +94,9 @@ module.exports.checkModifyTour = modifyRule({
     const { ownerId } = req.body;
     return ownerId && ownerId === userId;
   },
+});
+
+// Users Permissions
+module.exports.checkGetAllUsers = modifyRule({
+  allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER],
 });

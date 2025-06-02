@@ -1,5 +1,8 @@
 const { db, auth } = require("../Server");
-const { dbCollectionName } = require("../Server/enums/dbEnum");
+const {
+  dbCollectionName,
+  dbCollectionDocName,
+} = require("../Server/enums/dbEnum");
 
 const { Platform, UserRole } = require("../enum");
 
@@ -11,8 +14,11 @@ const { createToken } = require("../utils/jwt");
 const { hashPwd, verifyPassword } = require("../utils/pwdUtils");
 
 const userCollection = db.collection(dbCollectionName.USER);
+const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
+const allUserDocRef = allDataList.doc(dbCollectionDocName.ALL_USERS);
 
 const admin = require("firebase-admin");
+const { interError } = require("../utils/utilFunctions");
 
 exports.register = async (req, res) => {
   try {
@@ -318,5 +324,159 @@ exports.refreshToken = async (req, res) => {
       code: 500,
       details: {},
     });
+  }
+};
+
+exports.mapUsers = async (req, res) => {
+  try {
+    const userSnapshot = await userCollection.get();
+
+    if (userSnapshot.empty)
+      return res.status(404).json({
+        error: "No users found",
+        code: 404,
+      });
+
+    const allUsersData = {};
+    userSnapshot.forEach((user) => {
+      const userData = user.data();
+      allUsersData[user.id] = userData;
+    });
+
+    await allUserDocRef.set(allUsersData, { merge: true });
+
+    return res.status(200).json({
+      message: "All users synced to List/allUser successfully",
+      count: userSnapshot.size,
+    });
+  } catch (err) {
+    return interError(res, err);
+  }
+};
+
+exports.getAllUsers = async (req, res) => {
+  try {
+    const userRole = req.user?.role || UserRole.VISITOR;
+    const userId = req.user?.uid || "";
+
+    if (userRole == UserRole.VISITOR || !userId) {
+      res.status(401).json({ error: "Unauthorized" });
+      return;
+    }
+
+    const allUsers = await allDataList.doc(dbCollectionDocName.ALL_USERS).get();
+
+    if (!allUsers.exists)
+      return res.status(404).json({
+        error: "No collection table found",
+        code: 404,
+      });
+
+    const allUsersData = allUsers.data();
+
+    const usersArray = Object.values(allUsersData).map((user) => {
+      const userData = user;
+      userData.validFcmTokens = user?.fcmTokens.length ?? 0;
+      delete userData.fcmTokens;
+      delete userData.token;
+      delete userData.refreshToken;
+      delete userData.password;
+      return userData;
+    });
+
+    return res.status(200).json(usersArray);
+  } catch (error) {
+    return interError(res, error);
+  }
+};
+
+exports.updateUserRole = async (req, res) => {
+  try {
+    const { id: userId, role } = req.params;
+
+    if (!userId)
+      return res.status(400).json({
+        error: "Missing userId",
+        code: 400,
+      });
+
+    const userDoc = await userCollection.doc(userId).get();
+
+    if (!userDoc.exists)
+      return res.status(400).json({
+        error: "Missing user data",
+        code: 400,
+      });
+
+    await userDoc.ref.update({
+      role: Number(role),
+    });
+
+    const newUserData = { ...userDoc.data(), role: Number(role) };
+
+    const allUserRef = allDataList.doc(dbCollectionDocName.ALL_USERS);
+    await allUserRef.update({
+      [userId]: { ...newUserData },
+    });
+
+    delete newUserData.token;
+    delete newUserData.refreshToken;
+    delete newUserData.password;
+
+    return res.status(200).json({
+      data: newUserData,
+      code: 200,
+    });
+  } catch (error) {
+    return interError(res, error);
+  }
+};
+
+exports.toggleUserReceiveNotification = async (req, res) => {
+  try {
+    const { id: userId, receiveNotification } = req.params;
+
+    if (!userId)
+      return res.status(400).json({
+        error: "Missing userId",
+        code: 400,
+      });
+
+    const userDoc = await userCollection.doc(userId).get();
+
+    if (!userDoc.exists)
+      return res.status(400).json({
+        error: "Missing user data",
+        code: 400,
+      });
+
+    const newReceiveProp = isNaN(receiveNotification)
+      ? false
+      : Number(receiveNotification) == 1;
+
+    await userDoc.ref.update({
+      receiveNotifications: newReceiveProp,
+    });
+
+    const newUserData = {
+      ...userDoc.data(),
+      receiveNotifications: newReceiveProp,
+    };
+
+    const allUserRef = allDataList.doc(dbCollectionDocName.ALL_USERS);
+    await allUserRef.update({
+      [userId]: { ...newUserData },
+    });
+
+    delete newUserData.token;
+    delete newUserData.refreshToken;
+    delete newUserData.password;
+
+    return res.status(200).json({
+      data: newUserData,
+      code: 200,
+    });
+  } catch (error) {
+    return interError(res, error);
   }
 };

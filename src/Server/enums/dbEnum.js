@@ -12,6 +12,7 @@ const dbCollectionDocName = Object.freeze({
   ALL_END_TOUR_NOTIFICATIONS: "AllEndTourNotifications",
   ALL_TOURS: "AllTours",
   ALL_DOG_OWNERS: "AllDogOwners",
+  ALL_USERS: "AllUsers",
 });
 
 module.exports = { dbCollectionName, dbCollectionDocName };

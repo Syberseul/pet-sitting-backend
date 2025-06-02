@@ -3,6 +3,7 @@ const { UserRole } = require("../enum");
 module.exports.DefaultUserInfo = Object.freeze({
   createdAt: new Date().getTime(),
   role: UserRole.VISITOR,
+  receiveNotifications: false,
 
   id: "",
   email: "",
