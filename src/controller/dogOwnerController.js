@@ -100,7 +100,12 @@ exports.updateDogOwner = async (req, res) => {
       ...doc.data(),
       name: name ?? "",
       contactNo: contactNo ?? "",
-      dogs: dogs ?? [],
+      dogs: dogs.length
+        ? dogs.map((dog) => {
+            if (!dog.hasOwnProperty("uid")) dog.uid = uuid();
+            return dog;
+          })
+        : [],
     };
 
     await ownerRef.update(data);
