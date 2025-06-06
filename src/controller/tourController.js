@@ -30,6 +30,9 @@ exports.createTour = async (req, res) => {
     ...req.body,
   };
 
+  // value determine for UI only
+  delete tourData.checked;
+
   const tourListRef = tourCollection.doc();
   const tourListId = tourListRef.id;
 

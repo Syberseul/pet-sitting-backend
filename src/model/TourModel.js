@@ -12,6 +12,7 @@ module.exports.TourInfo = Object.freeze({
   ownerName: "",
   isFromWx: false,
   wxId: "",
+  finished: false, // value to determine if tour is finished or not - picked up
   startDate: new Date(),
   endDate: new Date(),
   notes: [], // additional information
