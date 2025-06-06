@@ -222,6 +222,9 @@ exports.login = async (req, res) => {
       token: firebaseCustomToken,
       refreshToken: longToken,
       role,
+      receiveNotifications:
+        userData.receiveNotifications ??
+        [UserRole.ADMIN, UserRole.DEVELOPER].includes(role),
     });
   } catch (error) {
     console.error("Login Error:", error);
@@ -452,7 +455,9 @@ exports.toggleUserReceiveNotification = async (req, res) => {
 
     const newReceiveProp = isNaN(receiveNotification)
       ? false
-      : Number(receiveNotification) == 1;
+      : [UserRole.ADMIN, UserRole.DEVELOPER].includes(userDoc.data().role)
+      ? Number(receiveNotification) == 1
+      : false;
 
     await userDoc.ref.update({
       receiveNotifications: newReceiveProp,

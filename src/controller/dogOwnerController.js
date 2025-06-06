@@ -15,8 +15,12 @@ const {
 
 const { v4: uuid } = require("uuid");
 
+const admin = require("firebase-admin");
+const { prepareDogRemoval } = require("./dogController");
+
 const dogOwnerCollection = db.collection(dbCollectionName.DOG_OWNER);
 const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
+const allOwnersRef = allDataList.doc(dbCollectionDocName.ALL_DOG_OWNERS);
 
 exports.createDogOwner = async (req, res) => {
   try {
@@ -54,8 +58,6 @@ exports.createDogOwner = async (req, res) => {
 
     try {
       await ownerListRef.set(ownerData);
-
-      const allOwnersRef = allDataList.doc(dbCollectionDocName.ALL_DOG_OWNERS);
 
       await allOwnersRef.update({
         [ownerListId]: { ...ownerData, uid: ownerListId },
@@ -110,7 +112,7 @@ exports.updateDogOwner = async (req, res) => {
 
     await ownerRef.update(data);
 
-    await allDataList.doc(dbCollectionDocName.ALL_DOG_OWNERS).update({
+    await allOwnersRef.update({
       [id]: data,
     });
 
@@ -148,9 +150,7 @@ exports.getDogOwnerInfo = async (req, res) => {
 
 exports.getAllDogOwners = async (req, res) => {
   try {
-    const allOwners = await allDataList
-      .doc(dbCollectionDocName.ALL_DOG_OWNERS)
-      .get();
+    const allOwners = await allOwnersRef.get();
 
     if (!allOwners.exists)
       return res.status(404).json({
@@ -165,5 +165,49 @@ exports.getAllDogOwners = async (req, res) => {
     return res.status(200).json(ownersArray);
   } catch (error) {
     return interError(res, error);
+  }
+};
+
+exports.removeDogOwner = async (req, res) => {
+  const { id } = req.params;
+
+  try {
+    const batch = db.batch();
+    const allNotifications = [];
+    const ownerRef = dogOwnerCollection.doc(id);
+    const ownerDoc = await ownerRef.get();
+
+    if (!ownerDoc.exists)
+      return res.status(404).json({ error: "Owner not found", code: 404 });
+
+    batch.update(allOwnersRef, {
+      [id]: admin.firestore.FieldValue.delete(),
+    });
+
+    const dogs = ownerDoc.data().dogs || [];
+    const dogRemovalPromises = dogs.map((dog) =>
+      prepareDogRemoval(dog.uid, batch).then((result) => {
+        allNotifications.push(...result.notifications);
+      })
+    );
+
+    await Promise.all(dogRemovalPromises);
+
+    batch.delete(ownerRef);
+
+    await batch.commit();
+
+    await Promise.allSettled(allNotifications);
+
+    return res.status(200).json({
+      message: `Owner and ${dogs.length} dogs removed`,
+      data: {
+        ownerId: id,
+        deletedDogs: dogs.length,
+      },
+    });
+  } catch (err) {
+    console.error("[removeDogOwner] Error:", err);
+    return interError(res, err);
   }
 };

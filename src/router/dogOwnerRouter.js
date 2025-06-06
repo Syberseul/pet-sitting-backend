@@ -38,4 +38,13 @@ router.post("/create", checkCreateOwner, dogOwnerController.createDogOwner);
  */
 router.put("/update/:id", checkUpdateOwner, dogOwnerController.updateDogOwner);
 
+/**
+ * ADMIN / DEVELOPER ONLY
+ */
+router.delete(
+  "/remove/:id",
+  checkGetAllOwners,
+  dogOwnerController.removeDogOwner
+);
+
 module.exports = router;
