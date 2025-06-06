@@ -47,7 +47,7 @@ exports.createDogOwner = async (req, res) => {
       dogs: dogs.map((dog) => ({
         ...DogInfo,
         ...dog,
-        uid: uuid(),
+        uid: dog.uid ? dog.uid : uuid(),
         ownerId: ownerListId,
       })),
       contactNo: contactNo ?? "",
@@ -85,40 +85,59 @@ exports.updateDogOwner = async (req, res) => {
   if (!id)
     return res.status(401).json({ error: "Missing owner ID", code: 401 });
 
-  const { name, contactNo, dogs } = req.body;
+  const { name, contactNo, dogs: newDogs = [] } = req.body;
 
   const ownerRef = dogOwnerCollection.doc(id);
 
   try {
     const doc = await ownerRef.get();
-
     if (!doc.exists)
-      return res.status(400).json({
-        error: "No dog owner found",
-        code: 400,
+      return res.status(404).json({
+        error: "Owner not found",
+        code: 404,
       });
 
-    const data = {
-      ...doc.data(),
+    const currentData = doc.data();
+    const currentDogs = currentData.dogs || [];
+
+    const removedDogs = currentDogs.filter(
+      (currDog) => !newDogs.some((newDog) => newDog.uid === currDog.uid)
+    );
+
+    const batch = db.batch();
+    const allNotifications = [];
+
+    const dogRemovalPromises = removedDogs.map((dog) =>
+      prepareDogRemoval(dog.uid, batch).then((result) => {
+        allNotifications.push(...result.notifications);
+      })
+    );
+
+    await Promise.all(dogRemovalPromises);
+
+    const updatedData = {
+      ...currentData,
       name: name ?? "",
       contactNo: contactNo ?? "",
-      dogs: dogs.length
-        ? dogs.map((dog) => {
-            if (!dog.hasOwnProperty("uid")) dog.uid = uuid();
+      dogs: newDogs.length
+        ? newDogs.map((dog) => {
+            if (!dog.hasOwnProperty("uid") || !dog.uid) dog.uid = uuid();
+            if (!dog.hasOwnProperty("ownerId") || !dog.ownerId)
+              dog.ownerId = id;
             return dog;
           })
         : [],
     };
 
-    await ownerRef.update(data);
+    batch.update(ownerRef, updatedData);
+    batch.update(allOwnersRef, { [id]: updatedData });
 
-    await allOwnersRef.update({
-      [id]: data,
-    });
+    await batch.commit();
+    await Promise.allSettled(allNotifications);
 
     return res.status(200).json({
-      data,
-      message: "Owner updated",
+      data: updatedData,
+      message: `Owner updated, with ${removedDogs.length} dogs' tours been removed.`,
     });
   } catch (error) {
     return interError(res, error);
