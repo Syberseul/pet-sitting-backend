@@ -69,18 +69,28 @@ exports.createDog = async (req, res) => {
 exports.updateDog = async (req, res) => {
   const { ownerId, uid } = req.body;
 
-  if (!ownerId || !uid)
+  if (!ownerId || !uid) {
     return res.status(400).json({
       error: "Missing required ID",
       code: 400,
     });
+  }
 
   try {
     let updatedOwnerData;
+    let toursToUpdate = [];
+
+    const toursQuery = tourCollection.where("dogId", "==", uid);
+    const toursSnapshot = await toursQuery.get();
+    toursSnapshot.forEach((doc) => {
+      toursToUpdate.push({
+        id: doc.id,
+        data: doc.data(),
+      });
+    });
 
     await db.runTransaction(async (transaction) => {
       const ownerDoc = await transaction.get(dogOwnerCollection.doc(ownerId));
-
       if (!ownerDoc.exists) throw new Error("Missing Owner info");
 
       const newDogs = ownerDoc.data().dogs.map((d) => {
@@ -92,15 +102,29 @@ exports.updateDog = async (req, res) => {
           uid,
         };
       });
+
       updatedOwnerData = {
         ...ownerDoc.data(),
         dogs: newDogs,
       };
 
-      transaction.update(dogOwnerCollection.doc(ownerId), {
-        dogs: newDogs,
-      });
+      transaction.update(dogOwnerCollection.doc(ownerId), { dogs: newDogs });
       transaction.update(allOwnerRef, { [ownerId]: updatedOwnerData });
+
+      toursToUpdate.forEach((tour) => {
+        const tourRef = tourCollection.doc(tour.id);
+        const newTourInfo = {
+          ...tour.data,
+          breedName: req.body.breedName || tour.data.breedName,
+          breedType: req.body.breedType || tour.data.breedType,
+          desex: req.body.desex ?? tour.data.desex,
+          dogName: req.body.dogName || tour.data.dogName,
+          sex: req.body.sex ?? tour.data.sex,
+          weight: req.body.weight ?? tour.data.weight,
+        };
+        transaction.update(tourRef, newTourInfo);
+        transaction.update(allTourRef, { [tour.id]: newTourInfo });
+      });
     });
 
     return res.status(200).json({
@@ -108,11 +132,13 @@ exports.updateDog = async (req, res) => {
       message: "Dog updated successfully",
     });
   } catch (err) {
-    if (err.message === "Missing Owner info")
+    console.error("Error in updateDog:", err);
+    if (err.message === "Missing Owner info") {
       return res.status(404).json({
         error: "Missing Owner info",
         code: 404,
       });
+    }
     return interError(res, err);
   }
 };
