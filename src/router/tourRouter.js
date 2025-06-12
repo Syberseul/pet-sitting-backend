@@ -28,6 +28,12 @@ router.put("/updateTour/:id", checkModifyTour, tourRouter.updateTour);
 
 /**
  * ADMIN / DEVELOPER
+ * DOG OWNER - will implement ITF, ONLY allow update his/her own tour
+ */
+router.put("/markTourFinish/:id", checkModifyTour, tourRouter.markTourFinish);
+
+/**
+ * ADMIN / DEVELOPER
  * DOG OWNER - will implement ITF, ONLY allow remove his/her own tour
  */
 router.delete("/removeTour/:id", checkModifyTour, tourRouter.removeTour);

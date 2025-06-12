@@ -14,7 +14,8 @@ const {
   dbCollectionDocName,
 } = require("../Server/enums/dbEnum");
 
-const { UserRole } = require("../enum");
+const { UserRole, TourStatus } = require("../enum");
+const { getTourStatus, getTodayDateString } = require("../utils/helper");
 
 const tourCollection = db.collection(dbCollectionName.DOG_TOUR);
 const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
@@ -63,8 +64,7 @@ exports.createTour = async (req, res) => {
 exports.updateTour = async (req, res) => {
   const { id } = req.params;
 
-  if (!id)
-    return res.status(401).json({ error: "Missing owner ID", code: 401 });
+  if (!id) return res.status(401).json({ error: "Missing tour ID", code: 401 });
 
   const { dogId, ownerId } = req.body;
 
@@ -86,6 +86,8 @@ exports.updateTour = async (req, res) => {
       ...doc.data(),
       ...req.body,
     };
+
+    data.status = getTourStatus(data);
 
     await tourRef.update(data);
 
@@ -162,6 +164,42 @@ exports.getAllTours = async (req, res) => {
         : toursArray;
 
     return res.status(200).json(filteredTours);
+  } catch (error) {
+    return interError(res, error);
+  }
+};
+
+exports.markTourFinish = async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) return res.status(401).json({ error: "Missing tour ID", code: 401 });
+
+  const tourRef = tourCollection.doc(id);
+
+  try {
+    const doc = await tourRef.get();
+
+    if (!doc.exists)
+      return res.status(400).json({ error: "No tour found", code: 400 });
+
+    const data = {
+      ...doc.data(),
+      status: TourStatus.FINISHED,
+      endDate: getTodayDateString(),
+    };
+
+    await tourRef.update(data);
+
+    await allDataList.doc(dbCollectionDocName.ALL_TOURS).update({
+      [id]: data,
+    });
+
+    await NotificationService.updateTourNotification(id, data);
+
+    return res.status(200).json({
+      data,
+      message: "Tour mark as finished!",
+    });
   } catch (error) {
     return interError(res, error);
   }

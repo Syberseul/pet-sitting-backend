@@ -17,4 +17,10 @@ const AuthPlatform = Object.freeze({
   GITHUB: "github",
 });
 
-module.exports = { UserRole, Platform, AuthPlatform };
+const TourStatus = Object.freeze({
+  PENDING: 0,
+  DELIVERED: 1,
+  FINISHED: 2,
+});
+
+module.exports = { UserRole, Platform, AuthPlatform, TourStatus };

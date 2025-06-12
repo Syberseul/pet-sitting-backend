@@ -1,3 +1,5 @@
+const { TourStatus } = require("../enum");
+
 module.exports.TourInfo = Object.freeze({
   createdAt: new Date().getTime(),
 
@@ -16,4 +18,5 @@ module.exports.TourInfo = Object.freeze({
   startDate: new Date(),
   endDate: new Date(),
   notes: [], // additional information
+  status: TourStatus.PENDING,
 });
