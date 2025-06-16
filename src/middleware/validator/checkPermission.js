@@ -96,6 +96,10 @@ module.exports.checkModifyTour = modifyRule({
   },
 });
 
+module.exports.adminONLY = modifyRule({
+  allowedRoles: [UserRole.ADMIN],
+});
+
 // Users Permissions
 module.exports.checkGetAllUsers = modifyRule({
   allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER],

@@ -5,11 +5,6 @@ exports.getTourStatus = (tourInfo) => {
 
   if (!startDate || !endDate) return TourStatus.PENDING;
 
-  const _parseDate = (str) => {
-    const [year, month, day] = str.split("-").map(Number);
-    return new Date(year, month - 1, day);
-  };
-
   const today = new Date().setHours(0, 0, 0, 0);
   const start = _parseDate(startDate);
   const end = _parseDate(endDate);
@@ -26,4 +21,20 @@ exports.getTodayDateString = () => {
   const date = today.getDate().toString().padStart(2, "0");
 
   return `${year}-${month}-${date}`;
+};
+
+exports.checkTourIsFinished = (tourInfo) => {
+  const { endDate, status } = tourInfo;
+
+  if (status === TourStatus.FINISHED || !endDate) return true;
+
+  const today = new Date().setHours(0, 0, 0, 0);
+  const end = _parseDate(endDate);
+
+  return today > end;
+};
+
+const _parseDate = (str) => {
+  const [year, month, day] = str.split("-").map(Number);
+  return new Date(year, month - 1, day);
 };

@@ -6,6 +6,7 @@ const tourRouter = require("../controller/tourController");
 const {
   checkGetAllTours,
   checkModifyTour,
+  adminONLY,
 } = require("../middleware/validator/checkPermission");
 
 /**
@@ -37,5 +38,14 @@ router.put("/markTourFinish/:id", checkModifyTour, tourRouter.markTourFinish);
  * DOG OWNER - will implement ITF, ONLY allow remove his/her own tour
  */
 router.delete("/removeTour/:id", checkModifyTour, tourRouter.removeTour);
+
+/**
+ * ADMIN ONLY
+ */
+router.post(
+  "/extractFinishedTours",
+  adminONLY,
+  tourRouter.extractFinishedTours
+);
 
 module.exports = router;

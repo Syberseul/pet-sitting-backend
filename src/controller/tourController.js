@@ -15,7 +15,11 @@ const {
 } = require("../Server/enums/dbEnum");
 
 const { UserRole, TourStatus } = require("../enum");
-const { getTourStatus, getTodayDateString } = require("../utils/helper");
+const {
+  getTourStatus,
+  getTodayDateString,
+  checkTourIsFinished,
+} = require("../utils/helper");
 
 const tourCollection = db.collection(dbCollectionName.DOG_TOUR);
 const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
@@ -200,6 +204,72 @@ exports.markTourFinish = async (req, res) => {
       data,
       message: "Tour mark as finished!",
     });
+  } catch (error) {
+    return interError(res, error);
+  }
+};
+
+exports.extractFinishedTours = async (req, res) => {
+  try {
+    const allTours = await allDataList.doc(dbCollectionDocName.ALL_TOURS).get();
+
+    if (!allTours.exists)
+      return res.status(404).json({
+        error: "No collection table found",
+        code: 404,
+      });
+
+    const allToursData = Object.values(allTours.data());
+
+    const allFinishedTours = allToursData.filter((tour) =>
+      checkTourIsFinished(tour)
+    );
+
+    if (!allFinishedTours.length)
+      return res.status(200).json({
+        data: [],
+        message: "No finished tours need to be extracted.",
+      });
+
+    const DELETE_THRESHOLD = 10;
+    const BATCH_LIMIT = 500;
+
+    const notificationPromises = [];
+    const allToursRef = allDataList.doc(dbCollectionDocName.ALL_TOURS);
+
+    for (let i = 0; i < allFinishedTours.length; i += BATCH_LIMIT) {
+      const chunk = allFinishedTours.slice(i, i + BATCH_LIMIT);
+      const chunkBatch = db.batch();
+
+      chunk.forEach((tour) => {
+        const tourRef = tourCollection.doc(tour.uid);
+        chunkBatch.delete(tourRef);
+        notificationPromises.push(
+          NotificationService.cancelTourNotification(tour.uid)
+        );
+
+        if (allFinishedTours.length <= DELETE_THRESHOLD)
+          chunkBatch.update(allToursRef, {
+            [tour.uid]: admin.firestore.FieldValue.delete(),
+          });
+      });
+
+      await chunkBatch.commit();
+    }
+
+    if (allFinishedTours.length > DELETE_THRESHOLD) {
+      const remainingToursSnapshot = await tourCollection.get();
+      const remainingTours = remainingToursSnapshot.empty
+        ? {}
+        : Object.fromEntries(
+            remainingToursSnapshot.docs.map((doc) => [doc.id, doc.data()])
+          );
+      await allDataList.doc(dbCollectionDocName.ALL_TOURS).set(remainingTours);
+    }
+
+    await Promise.allSettled(notificationPromises);
+
+    return res.status(200).json(allFinishedTours);
   } catch (error) {
     return interError(res, error);
   }
