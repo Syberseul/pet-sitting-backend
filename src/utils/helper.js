@@ -38,3 +38,17 @@ const _parseDate = (str) => {
   const [year, month, day] = str.split("-").map(Number);
   return new Date(year, month - 1, day);
 };
+
+exports.isDateBeforeToday = (date) => {
+  if (!date) return true;
+  const parts = date.split("-");
+  if (parts.length !== 3) return true;
+  const year = parseInt(parts[0], 10);
+  const month = parseInt(parts[1], 10);
+  const day = parseInt(parts[2], 10);
+  const inputDate = new Date(year, month - 1, day);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  inputDate.setHours(0, 0, 0, 0);
+  return inputDate < today;
+};

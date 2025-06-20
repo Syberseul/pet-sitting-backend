@@ -19,6 +19,7 @@ const {
   getTourStatus,
   getTodayDateString,
   checkTourIsFinished,
+  isDateBeforeToday,
 } = require("../utils/helper");
 
 const tourCollection = db.collection(dbCollectionName.DOG_TOUR);
@@ -70,7 +71,7 @@ exports.updateTour = async (req, res) => {
 
   if (!id) return res.status(401).json({ error: "Missing tour ID", code: 401 });
 
-  const { dogId, ownerId } = req.body;
+  const { dogId, ownerId, endDate } = req.body;
 
   if (!dogId || !ownerId)
     return res.status(400).json({ error: "Missing ID", code: 400 });
@@ -92,6 +93,10 @@ exports.updateTour = async (req, res) => {
     };
 
     data.status = getTourStatus(data);
+
+    // if new updated endDate is after today, tour status suppose to reset back to PENDING
+    if (endDate && !isDateBeforeToday(endDate))
+      data.status = TourStatus.PENDING;
 
     await tourRef.update(data);
 
@@ -186,10 +191,14 @@ exports.markTourFinish = async (req, res) => {
     if (!doc.exists)
       return res.status(400).json({ error: "No tour found", code: 400 });
 
+    const docData = doc.data();
+
     const data = {
-      ...doc.data(),
+      ...docData,
       status: TourStatus.FINISHED,
-      endDate: getTodayDateString(),
+      endDate: isDateBeforeToday(docData.endDate)
+        ? docData.endDate
+        : getTodayDateString(),
     };
 
     await tourRef.update(data);
