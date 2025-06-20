@@ -16,6 +16,7 @@ const ScheduledEndTourNotifications = db.collection(
   dbCollectionName.END_TOUR_NOTIFICATIONS
 );
 const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
+const tourCollection = db.collection(dbCollectionName.DOG_TOUR);
 
 const LIMIT_SENDING_NOTIFICATIONS = 100;
 
@@ -178,6 +179,78 @@ class NotificationService {
       await this.sendGroupedEndNotification(tours);
     } catch (err) {
       error(`Failed check pending END notifications: ${err}`);
+    }
+  }
+
+  static async checkAndMarkToursToFinish() {
+    try {
+      const allToursDoc = await allDataList
+        .doc(dbCollectionDocName.ALL_TOURS)
+        .get();
+      if (!allToursDoc.exists) {
+        console.error("AllTours document does not exist!");
+        return;
+      }
+
+      const allTours = allToursDoc.data() || {};
+
+      const isEndDateBeforeToday = (date) => {
+        if (!date) return true;
+        const parts = date.split("-");
+        if (parts.length !== 3) return true;
+        const year = parseInt(parts[0], 10);
+        const month = parseInt(parts[1], 10);
+        const day = parseInt(parts[2], 10);
+        const inputDate = new Date(year, month - 1, day);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        inputDate.setHours(0, 0, 0, 0);
+        return inputDate < today;
+      };
+
+      const toursToUpdate = Object.entries(allTours)
+        .filter(([id, tour]) => {
+          return (
+            (!tour.hasOwnProperty("status") || tour.status !== 2) &&
+            isEndDateBeforeToday(tour.endDate)
+          );
+        })
+        .map(([id, tour]) => ({ id, ...tour }));
+
+      if (toursToUpdate.length === 0) {
+        console.log("No tours need to be marked as Finished");
+        return;
+      }
+
+      const batch = db.batch();
+      const relatedTourIds = [];
+
+      for (const tour of toursToUpdate) {
+        const tourRef = tourCollection.doc(tour.id);
+        const updatedData = {
+          ...tour,
+          status: 2,
+        };
+
+        batch.update(tourRef, updatedData);
+
+        const allToursRef = allDataList.doc(dbCollectionDocName.ALL_TOURS);
+        batch.update(allToursRef, {
+          [`${tour.id}`]: updatedData,
+        });
+
+        relatedTourIds.push(tour.id);
+      }
+
+      await batch.commit();
+
+      await NotificationService.completeTourNotification(relatedTourIds);
+
+      console.log(
+        `Successfully marked ${toursToUpdate.length} tours as Finished.`
+      );
+    } catch (error) {
+      console.error(`Failed to check and mark tours as Finished: ${error}`);
     }
   }
 

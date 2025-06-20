@@ -49,3 +49,27 @@ exports.checkEndNotifications = onSchedule(
     }
   }
 );
+
+exports.checkAndMarkToursToFinished = onSchedule(
+  {
+    schedule: "every day 00:01", // everyday at 00:01am
+    // schedule: "every 1 minutes",
+    timeoutSeconds: 300, // 5 mins timeout
+    timeZone: "Australia/Melbourne",
+    region: "australia-southeast1",
+  },
+  async () => {
+    try {
+      await NotificationService.checkAndMarkToursToFinish();
+      log(
+        "Successfully triggered timer function for check & mark tours to finished status!"
+      );
+    } catch (error) {
+      error(
+        `❌ Failed trigger timer function for check & mark tours to finished status: ${
+          err?.message ?? "Unknown error"
+        }`
+      );
+    }
+  }
+);
