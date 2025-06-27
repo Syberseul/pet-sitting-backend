@@ -66,7 +66,7 @@ module.exports.checkCreateOwner = modifyRule({
 module.exports.checkUpdateOwner = modifyRule({
   allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER, UserRole.DOG_OWNER],
   customCheck: async ({ req, userRole, userId }) => {
-    if (userRole != UserRole.DOG_OWNER) return true;
+    if ([UserRole.ADMIN, UserRole.DEVELOPER].includes(userRole)) return true;
     const { id } = req.params;
     return id && id === userId;
   },
@@ -103,4 +103,18 @@ module.exports.adminONLY = modifyRule({
 // Users Permissions
 module.exports.checkGetAllUsers = modifyRule({
   allowedRoles: [UserRole.ADMIN, UserRole.DEVELOPER],
+});
+
+module.exports.updateUserInfo = modifyRule({
+  allowedRoles: [
+    UserRole.ADMIN,
+    UserRole.DEVELOPER,
+    UserRole.DOG_OWNER,
+    UserRole.VISITOR,
+  ],
+  customCheck: async ({ req, userRole, userId }) => {
+    if ([UserRole.ADMIN, UserRole.DEVELOPER].includes(userRole)) return true;
+    const { id } = req.params;
+    return userId && userId === id;
+  },
 });

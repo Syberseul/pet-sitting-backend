@@ -3,7 +3,10 @@ const router = express.Router();
 
 const userController = require("../controller/userController");
 
-const { checkGetAllUsers } = require("../middleware/validator/checkPermission");
+const {
+  checkGetAllUsers,
+  updateUserInfo,
+} = require("../middleware/validator/checkPermission");
 
 router.get("/all", checkGetAllUsers, userController.getAllUsers);
 
@@ -28,5 +31,7 @@ router.put(
   checkGetAllUsers,
   userController.toggleUserReceiveNotification
 );
+
+router.put("/updateUser/:id", updateUserInfo, userController.updateUserInfo);
 
 module.exports = router;

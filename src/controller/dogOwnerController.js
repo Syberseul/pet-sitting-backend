@@ -167,6 +167,50 @@ exports.getDogOwnerInfo = async (req, res) => {
   }
 };
 
+exports.getUserRefNo = async (req, res) => {
+  const { id } = req.params;
+
+  if (!id)
+    return res.status(401).json({ error: "Missing owner ID", code: 401 });
+
+  const ownerRef = dogOwnerCollection.doc(id);
+
+  try {
+    const doc = await ownerRef.get();
+    if (!doc.exists)
+      return res.status(401).json({ error: "Owner not found", code: 401 });
+
+    const ownerData = doc.data();
+
+    if (ownerData.hasOwnProperty("userRefNo"))
+      return res.status(200).json({
+        data: {
+          userRefNo: ownerData.userRefNo,
+        },
+      });
+
+    const updatedData = {
+      ...ownerData,
+      userRefNo: id,
+    };
+
+    const batch = db.batch();
+
+    batch.update(ownerRef, updatedData);
+    batch.update(allOwnersRef, { [id]: updatedData });
+
+    await batch.commit();
+
+    return res.status(200).json({
+      data: {
+        userRefNo: updatedData.userRefNo,
+      },
+    });
+  } catch (error) {
+    return interError(res, error);
+  }
+};
+
 exports.getAllDogOwners = async (req, res) => {
   try {
     const allOwners = await allOwnersRef.get();

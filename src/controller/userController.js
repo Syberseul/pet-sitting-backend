@@ -24,7 +24,15 @@ exports.register = async (req, res) => {
   try {
     const isWxPlatform = req.headers.platform == Platform.WX;
 
-    const { email, password, userName, wxId, googleId, githubId } = req.body;
+    const {
+      email,
+      password,
+      userName,
+      wxId,
+      googleId,
+      githubId,
+      dogOwnerRefNo,
+    } = req.body;
 
     let userRecord;
 
@@ -90,6 +98,8 @@ exports.register = async (req, res) => {
       lastLogin: new Date().getTime(),
     };
 
+    if (dogOwnerRefNo) userData.dogOwnerRefNo = dogOwnerRefNo;
+
     // use Custom Claims to save USER ROLE to firebase
     await admin.auth().setCustomUserClaims(userRecord.uid, {
       role: UserRole.VISITOR,
@@ -99,14 +109,19 @@ exports.register = async (req, res) => {
 
     await userRef.set(userData);
 
-    return res.status(201).json({
+    const data = {
       uid: userRecord.uid,
       email: userRecord.email,
       userName,
       token: firebaseCustomToken,
       refreshToken: longToken,
-      role: UserRole.VISITOR,
-    });
+    };
+
+    if (dogOwnerRefNo) data.dogOwnerRefNo = dogOwnerRefNo;
+
+    data.role = dogOwnerRefNo ? UserRole.DOG_OWNER : UserRole.VISITOR;
+
+    return res.status(201).json(data);
   } catch (error) {
     return res.status(500).json({
       error: error.message || "Internal Error",
@@ -213,9 +228,10 @@ exports.login = async (req, res) => {
     });
 
     const role = userData.role || UserRole.VISITOR;
+
     await admin.auth().setCustomUserClaims(userDoc.id, { role });
 
-    return res.status(200).json({
+    const data = {
       uid: userDoc.id,
       email: userData.email,
       userName: userData.userName,
@@ -225,7 +241,11 @@ exports.login = async (req, res) => {
       receiveNotifications:
         userData.receiveNotifications ??
         [UserRole.ADMIN, UserRole.DEVELOPER].includes(role),
-    });
+    };
+
+    if (userData.dogOwnerRefNo) data.dogOwnerRefNo = userData.dogOwnerRefNo;
+
+    return res.status(200).json(data);
   } catch (error) {
     console.error("Login Error:", error);
 
@@ -276,6 +296,84 @@ exports.logout = async (req, res) => {
       error: "Internal server error",
       code: 500,
     });
+  }
+};
+
+exports.updateUserInfo = async (req, res) => {
+  try {
+    const { id: userId } = req.params;
+    const { email, password, userName, dogOwnerRefNo } = req.body;
+
+    if (!userId)
+      return res.status(400).json({
+        error: "Missing UserID",
+        code: 400,
+      });
+
+    if (!email)
+      return res.status(400).json({
+        error: "Missing Email",
+        code: 400,
+      });
+
+    const userRef = userCollection.doc(userId);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists)
+      return res.status(404).json({
+        error: "User Not Found",
+        code: 404,
+      });
+
+    // update Firebase Auth if password changes
+    if (password) await auth.updateUser(userId, { email });
+
+    const userData = userDoc.data();
+    let shouldSyncCustomUserClaims = false;
+
+    if (userName) userData.userName = userName;
+    if (dogOwnerRefNo && !userData.hasOwnProperty("dogOwnerRefNo")) {
+      userData.dogOwnerRefNo = dogOwnerRefNo;
+      userData.role = UserRole.DOG_OWNER;
+      shouldSyncCustomUserClaims = true;
+    }
+
+    if (shouldSyncCustomUserClaims)
+      await admin.auth().setCustomUserClaims(userId, {
+        role: userData.role,
+      });
+
+    const firebaseCustomToken = await auth.createCustomToken(userId);
+
+    const { longToken } = await createToken();
+
+    const batch = db.batch();
+
+    userData.refreshToken = longToken;
+    userData.lastLogin = new Date().getTime();
+
+    batch.update(userRef, userData);
+    batch.update(allUserDocRef, { [userId]: userData });
+
+    await batch.commit();
+
+    const responseData = {
+      uid: userId,
+      email: userData.email,
+      userName: userData.userName,
+      token: firebaseCustomToken,
+      refreshToken: longToken,
+      role: userData.role,
+      receiveNotifications:
+        userData.receiveNotifications ??
+        [UserRole.ADMIN, UserRole.DEVELOPER].includes(userData.role),
+    };
+
+    if (dogOwnerRefNo) responseData.dogOwnerRefNo = dogOwnerRefNo;
+
+    return res.status(200).json(responseData);
+  } catch (error) {
+    return interError(res, error);
   }
 };
 

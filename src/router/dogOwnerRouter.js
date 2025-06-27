@@ -25,6 +25,15 @@ router.get(
 router.get("/all", checkGetAllOwners, dogOwnerController.getAllDogOwners);
 
 /**
+ * ADMIN / DEVELOPER ONLY
+ */
+router.get(
+  "/getUserRefNo/:id",
+  checkGetAllOwners,
+  dogOwnerController.getUserRefNo
+);
+
+/**
  * ADMIN / DEVELOPER - access all details
  * DOG OWNER - NO ACCESS
  * VISITOR - SINGLE ACCESS to become a dog owner

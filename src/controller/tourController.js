@@ -169,7 +169,10 @@ exports.getAllTours = async (req, res) => {
 
     const filteredTours =
       userRole == UserRole.DOG_OWNER
-        ? filteredTours.filter((tour) => tour.ownerId === userId)
+        ? toursArray
+            .filter((tour) => tour.ownerId === userId)
+            .sort((a, b) => b.createdAt - a.createdAt)
+            .slice(0, 5)
         : toursArray;
 
     return res.status(200).json(filteredTours);
