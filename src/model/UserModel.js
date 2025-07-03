@@ -12,6 +12,7 @@ module.exports.DefaultUserInfo = Object.freeze({
   googleId: "",
   githubId: "",
   isFromWx: false,
+  linkedDogOwner: false,
 });
 
 module.exports.DogOwnerInfo = Object.freeze({

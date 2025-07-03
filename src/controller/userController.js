@@ -17,6 +17,9 @@ const userCollection = db.collection(dbCollectionName.USER);
 const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
 const allUserDocRef = allDataList.doc(dbCollectionDocName.ALL_USERS);
 
+const dogOwnerCollection = db.collection(dbCollectionName.DOG_OWNER);
+const allOwnersRef = allDataList.doc(dbCollectionDocName.ALL_DOG_OWNERS);
+
 const admin = require("firebase-admin");
 const { interError } = require("../utils/utilFunctions");
 
@@ -84,7 +87,7 @@ exports.register = async (req, res) => {
     const userRef = userCollection.doc(userRecord.uid);
 
     // NO NEED to save firebaseCustomToken into db, as it requires frontend to call firebase.auth().signInWithCustomToken(firebaseCustomToken) to get actual token
-    const userData = {
+    let userData = {
       ...DefaultUserInfo,
       id: userRecord.uid,
       email: email || "",
@@ -98,7 +101,16 @@ exports.register = async (req, res) => {
       lastLogin: new Date().getTime(),
     };
 
-    if (dogOwnerRefNo) userData.dogOwnerRefNo = dogOwnerRefNo;
+    const batch = db.batch();
+
+    if (dogOwnerRefNo) {
+      userData = await linkDogOwnerToUser(batch, dogOwnerRefNo, userData);
+      if (userData.error)
+        return res.status(500).json({
+          error: userData.error,
+          code: 500,
+        });
+    }
 
     // use Custom Claims to save USER ROLE to firebase
     await admin.auth().setCustomUserClaims(userRecord.uid, {
@@ -107,7 +119,9 @@ exports.register = async (req, res) => {
 
     if (isEmailAuth) userData.password = hashPwd(password);
 
-    await userRef.set(userData);
+    batch.set(userRef, userData);
+
+    await batch.commit();
 
     const data = {
       uid: userRecord.uid,
@@ -328,26 +342,29 @@ exports.updateUserInfo = async (req, res) => {
     // update Firebase Auth if password changes
     if (password) await auth.updateUser(userId, { email });
 
-    const userData = userDoc.data();
-    let shouldSyncCustomUserClaims = false;
+    let userData = userDoc.data();
 
     if (userName) userData.userName = userName;
-    if (dogOwnerRefNo && !userData.hasOwnProperty("dogOwnerRefNo")) {
-      userData.dogOwnerRefNo = dogOwnerRefNo;
-      userData.role = UserRole.DOG_OWNER;
-      shouldSyncCustomUserClaims = true;
-    }
 
-    if (shouldSyncCustomUserClaims)
+    const batch = db.batch();
+
+    if (dogOwnerRefNo) {
+      userData = await linkDogOwnerToUser(batch, dogOwnerRefNo, userData);
+
+      if (userData.error)
+        return res.status(500).json({
+          error: userData.error,
+          code: 500,
+        });
+
       await admin.auth().setCustomUserClaims(userId, {
         role: userData.role,
       });
+    }
 
     const firebaseCustomToken = await auth.createCustomToken(userId);
 
     const { longToken } = await createToken();
-
-    const batch = db.batch();
 
     userData.refreshToken = longToken;
     userData.lastLogin = new Date().getTime();
@@ -493,7 +510,7 @@ exports.getAllUsers = async (req, res) => {
 
 exports.updateUserRole = async (req, res) => {
   try {
-    const { id: userId, role } = req.params;
+    const { id: userId, role, dogOwnerRefNo } = req.params;
 
     if (!userId)
       return res.status(400).json({
@@ -514,6 +531,10 @@ exports.updateUserRole = async (req, res) => {
     });
 
     const newUserData = { ...userDoc.data(), role: Number(role) };
+
+    if (role === UserRole.DOG_OWNER && dogOwnerRefNo) {
+    } else if (role !== UserRole.DOG_OWNER) {
+    }
 
     const allUserRef = allDataList.doc(dbCollectionDocName.ALL_USERS);
     await allUserRef.update({
@@ -582,4 +603,27 @@ exports.toggleUserReceiveNotification = async (req, res) => {
   } catch (error) {
     return interError(res, error);
   }
+};
+
+const linkDogOwnerToUser = async (batch, dogOwnerRefNo, userData) => {
+  const ownerRef = dogOwnerCollection.doc(dogOwnerRefNo);
+  const ownerDoc = await ownerRef.get();
+
+  if (!ownerDoc.exists) throw new Error("Invalid dogOwnerRefNo");
+
+  const ownerData = ownerDoc.data();
+
+  if (ownerData.linkedDogOwner)
+    return { ...userData, error: "Dog owner already linked to another user" };
+
+  batch.update(ownerRef, { linkedDogOwner: true });
+  batch.update(allOwnersRef, {
+    [dogOwnerRefNo]: { ...ownerData, linkedDogOwner: true },
+  });
+
+  return {
+    ...userData,
+    dogOwnerRefNo,
+    role: UserRole.DOG_OWNER,
+  };
 };
