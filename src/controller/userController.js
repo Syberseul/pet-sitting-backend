@@ -510,7 +510,8 @@ exports.getAllUsers = async (req, res) => {
 
 exports.updateUserRole = async (req, res) => {
   try {
-    const { id: userId, role, dogOwnerRefNo } = req.params;
+    const { id: userId } = req.params;
+    const { role, dogOwnerRefNo } = req.body;
 
     if (!userId)
       return res.status(400).json({
@@ -518,7 +519,17 @@ exports.updateUserRole = async (req, res) => {
         code: 400,
       });
 
-    const userDoc = await userCollection.doc(userId).get();
+    const validRoles = Object.values(UserRole).filter(
+      (v) => typeof v === "number"
+    );
+    if (!validRoles.includes(Number(role)))
+      return res.status(400).json({
+        error: "Invalid role value",
+        code: 400,
+      });
+
+    const userRef = userCollection.doc(userId);
+    const userDoc = await userRef.get();
 
     if (!userDoc.exists)
       return res.status(400).json({
@@ -526,27 +537,52 @@ exports.updateUserRole = async (req, res) => {
         code: 400,
       });
 
-    await userDoc.ref.update({
-      role: Number(role),
-    });
+    let userData = userDoc.data();
 
-    const newUserData = { ...userDoc.data(), role: Number(role) };
+    const batch = db.batch();
 
+    // if new role is DOG_OWNER with dogOwnerRefNo, try link user with dogOwner
     if (role === UserRole.DOG_OWNER && dogOwnerRefNo) {
-    } else if (role !== UserRole.DOG_OWNER) {
+      userData = await linkDogOwnerToUser(batch, dogOwnerRefNo, userData);
+      if (userData.error)
+        return res.status(500).json({
+          error: userData.error,
+          code: 500,
+        });
+    }
+    // if new role is VISITOR, unlink user and dogOwner if necessary
+    else if (role === UserRole.VISITOR && userData.dogOwnerRefNo) {
+      userData = await unLinkDogOwnerAndUser(
+        batch,
+        userData.dogOwnerRefNo,
+        userData
+      );
     }
 
+    await admin.auth().setCustomUserClaims(userId, { role: Number(role) });
+
+    const newUserData = {
+      ...userData,
+      role: Number(role),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
     const allUserRef = allDataList.doc(dbCollectionDocName.ALL_USERS);
-    await allUserRef.update({
+
+    batch.update(userRef, newUserData);
+    batch.update(allUserRef, {
       [userId]: { ...newUserData },
     });
 
-    delete newUserData.token;
-    delete newUserData.refreshToken;
-    delete newUserData.password;
+    await batch.commit();
+
+    const responseData = { ...newUserData };
+    ["token", "refreshToken", "password"].forEach(
+      (field) => delete responseData[field]
+    );
 
     return res.status(200).json({
-      data: newUserData,
+      data: responseData,
       code: 200,
     });
   } catch (error) {
@@ -625,5 +661,66 @@ const linkDogOwnerToUser = async (batch, dogOwnerRefNo, userData) => {
     ...userData,
     dogOwnerRefNo,
     role: UserRole.DOG_OWNER,
+  };
+};
+
+exports.unlinkDogOwnerFromUser = async (req, res) => {
+  const { id: userId } = req.params;
+
+  if (!userId)
+    return res.status(400).json({
+      error: "Missing UserID",
+      code: 400,
+    });
+
+  try {
+    const userRef = userCollection.doc(userId);
+    const userDoc = await userRef.get();
+
+    if (!userDoc.exists)
+      return res.status(404).json({
+        error: "User Not Found",
+        code: 404,
+      });
+
+    let userData = userDoc.data();
+
+    if (!userData.dogOwnerRefNo) return res.status(200).json(userData);
+
+    const batch = db.batch();
+
+    userData = await unLinkDogOwnerAndUser(
+      batch,
+      userData.dogOwnerRefNo,
+      userData
+    );
+
+    batch.update(userRef, userData);
+    batch.update(allUserDocRef, { [userId]: userData });
+
+    await batch.commit();
+
+    return res.status(200).json(userData);
+  } catch (error) {
+    return interError(res, error);
+  }
+};
+
+const unLinkDogOwnerAndUser = async (batch, dogOwnerRefNo, userData) => {
+  const ownerRef = dogOwnerCollection.doc(dogOwnerRefNo);
+  const ownerDoc = await ownerRef.get();
+
+  if (!ownerDoc.exists) return userData;
+
+  const ownerData = ownerDoc.data();
+
+  batch.update(ownerRef, { linkedDogOwner: false });
+  batch.update(allOwnersRef, {
+    [dogOwnerRefNo]: { ...ownerData, linkedDogOwner: false },
+  });
+
+  return {
+    ...userData,
+    dogOwnerRefNo: null,
   };
 };

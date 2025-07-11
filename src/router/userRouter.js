@@ -6,6 +6,7 @@ const userController = require("../controller/userController");
 const {
   checkGetAllUsers,
   updateUserInfo,
+  checkModifyTour,
 } = require("../middleware/validator/checkPermission");
 
 router.get("/all", checkGetAllUsers, userController.getAllUsers);
@@ -21,7 +22,7 @@ router.post("/refreshToken", userController.refreshToken);
 router.post("/mapUsers", checkGetAllUsers, userController.mapUsers);
 
 router.put(
-  "/updateUserRole/:id/:role",
+  "/updateUserRole/:id",
   checkGetAllUsers,
   userController.updateUserRole
 );
@@ -33,5 +34,11 @@ router.put(
 );
 
 router.put("/updateUser/:id", updateUserInfo, userController.updateUserInfo);
+
+router.post(
+  "/removeLinkedDogOwner/:id",
+  checkGetAllUsers,
+  userController.unlinkDogOwnerFromUser
+);
 
 module.exports = router;
