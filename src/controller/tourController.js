@@ -24,6 +24,7 @@ const {
 
 const tourCollection = db.collection(dbCollectionName.DOG_TOUR);
 const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
+const userCollection = db.collection(dbCollectionName.USER);
 
 exports.createTour = async (req, res) => {
   const { dogId, ownerId } = req.body;
@@ -165,15 +166,23 @@ exports.getAllTours = async (req, res) => {
 
     const allToursData = allTours.data();
 
-    const toursArray = Object.values(allToursData);
+    const toursArray = Object.values(allToursData).sort(
+      (a, b) => b.createdAt - a.createdAt
+    );
 
-    const filteredTours =
-      userRole == UserRole.DOG_OWNER
-        ? toursArray
-            .filter((tour) => tour.ownerId === userId)
-            .sort((a, b) => b.createdAt - a.createdAt)
-            .slice(0, 5)
-        : toursArray;
+    if ([UserRole.ADMIN, UserRole.DEVELOPER].includes(userRole))
+      return res.status(200).json(toursArray);
+
+    // userRole === UserRole.DOG_OWNER
+    const userDoc = await userCollection.doc(userId).get();
+    const userData = userDoc.data();
+
+    if (!userData.dogOwnerRefNo) return interError(res, "No Dog Owner Linked");
+
+    // return most recent 5 tours
+    const filteredTours = toursArray
+      .filter((tour) => tour.ownerId === userData.dogOwnerRefNo)
+      .slice(0, 5);
 
     return res.status(200).json(filteredTours);
   } catch (error) {
