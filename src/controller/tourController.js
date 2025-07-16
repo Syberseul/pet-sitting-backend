@@ -180,11 +180,36 @@ exports.getAllTours = async (req, res) => {
     if (!userData.dogOwnerRefNo) return interError(res, "No Dog Owner Linked");
 
     // return most recent 5 tours
-    const filteredTours = toursArray
-      .filter((tour) => tour.ownerId === userData.dogOwnerRefNo)
-      .slice(0, 5);
+    const filteredTours = toursArray.filter(
+      (tour) => tour.ownerId === userData.dogOwnerRefNo
+    );
 
-    return res.status(200).json(filteredTours);
+    const MAX_COUNT = 5;
+    let maxCount = 0,
+      toursMap = new Map();
+
+    for (const tour of filteredTours) {
+      const { startDate, endDate } = tour;
+      const mergedDate = `${startDate}-${endDate}`;
+
+      if (toursMap.has(mergedDate))
+        toursMap.set(mergedDate, [...toursMap.get(mergedDate), tour]);
+      else if (maxCount < MAX_COUNT) {
+        maxCount++;
+        toursMap.set(mergedDate, [tour]);
+      }
+    }
+
+    const potentialTours = {};
+
+    for (const [key, value] of toursMap.entries()) {
+      potentialTours[key] = value;
+    }
+
+    return res.status(200).json({
+      tours: potentialTours,
+      count: maxCount,
+    });
   } catch (error) {
     return interError(res, error);
   }
