@@ -23,6 +23,7 @@ const TourStatus = Object.freeze({
   FINISHED: 2,
   PENDING_APPROVAL: 3,
   RECEIVING_APPROVED: 4,
+  CANCELLED: 9,
 });
 
 module.exports = { UserRole, Platform, AuthPlatform, TourStatus };

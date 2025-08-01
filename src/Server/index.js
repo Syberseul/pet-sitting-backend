@@ -14,6 +14,8 @@ admin.initializeApp({
 
 const db = admin.firestore();
 const auth = admin.auth();
+const messaging = admin.messaging();
+const bucket = admin.storage().bucket();
 
 admin
   .auth()
@@ -21,4 +23,4 @@ admin
   .then(() => console.log("✅ Firebase Admin connected"))
   .catch((err) => console.error("❌ Connection Failure:", err));
 
-module.exports = { db, auth };
+module.exports = { db, auth, messaging, bucket };

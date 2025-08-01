@@ -1,6 +1,6 @@
 const admin = require("firebase-admin");
 
-const { db } = require("./index");
+const { db, messaging } = require("./index");
 const { notificationStatus } = require("./enums");
 const {
   getNewNotificationTime,
@@ -8,6 +8,7 @@ const {
   isValidDateSendingNotification,
 } = require("../utils/utilFunctions");
 const { dbCollectionName, dbCollectionDocName } = require("./enums/dbEnum");
+const { UserRole } = require("../enum");
 
 const ScheduledNewTourNotifications = db.collection(
   dbCollectionName.NEW_TOUR_NOTIFICATIONS
@@ -18,6 +19,8 @@ const ScheduledEndTourNotifications = db.collection(
 const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
 
 class NotificationService {
+  static validRoles = [UserRole.ADMIN, UserRole.DEVELOPER];
+
   static async scheduleTourNotification(tourData) {
     if (!tourData.startDate || !tourData.endDate || !tourData.uid) return;
 
@@ -228,6 +231,51 @@ class NotificationService {
       await batch.commit();
     } catch (err) {
       console.log(err);
+    }
+  }
+
+  static async sendNotificationWhenTourCancelled(tourId) {
+    if (!tourId) return;
+
+    try {
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  static async sendInstantNotification(message, data = {}) {
+    const roles = data.roles || this.validRoles;
+
+    try {
+      const validUsers = await db
+        .collection("User")
+        .where("role", "in", roles)
+        .select("fcmTokens")
+        .get();
+
+      const tokens = validUsers.docs
+        .map((doc) => doc.data().fcmTokens || [])
+        .flat()
+        .filter(
+          (token) => !!token && typeof token === "string" && token.trim() !== ""
+        );
+
+      if (tokens.length === 0) {
+        console.warn("No valid ADMIN FCM Token");
+        return;
+      }
+
+      await messaging.sendEachForMulticast({
+        tokens,
+        notification: { title: "系统通知", body: message },
+        data: {
+          type: "admin_notification",
+          ...data,
+          click_action: "FLUTTER_NOTIFICATION_CLICK",
+        },
+      });
+    } catch (error) {
+      console.error("Failed sending instant notification:", error);
     }
   }
 }

@@ -1,7 +1,5 @@
 const { UserRole } = require("../../enum");
 const admin = require("firebase-admin");
-const { db, auth } = require("../../Server");
-const { dbCollectionName } = require("../../Server/enums/dbEnum");
 
 const modifyRule = (options = { allowedRoles: [], customCheck: null }) => {
   return async (req, res, next) => {
@@ -26,9 +24,8 @@ const modifyRule = (options = { allowedRoles: [], customCheck: null }) => {
           userRole,
           userId: decodedToken.uid,
         });
-        if (!customCheckResult) {
+        if (!customCheckResult)
           return res.status(403).json({ error: "Access denied" });
-        }
       }
 
       req.user = {

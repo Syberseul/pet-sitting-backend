@@ -3,10 +3,12 @@ const router = express.Router();
 
 const dogController = require("../controller/dogController");
 
-router.post("/createDog", dogController.createDog);
+const { checkModifyDog } = require("../middleware/validator/checkPermission");
 
-router.put("/updateDog", dogController.updateDog);
+router.post("/createDog", checkModifyDog, dogController.createDog);
 
-router.delete("/removeDog", dogController.removeDog);
+router.put("/updateDog", checkModifyDog, dogController.updateDog);
+
+router.delete("/removeDog", checkModifyDog, dogController.removeDog);
 
 module.exports = router;

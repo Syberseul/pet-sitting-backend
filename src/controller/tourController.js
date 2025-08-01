@@ -25,6 +25,7 @@ const {
 const tourCollection = db.collection(dbCollectionName.DOG_TOUR);
 const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
 const userCollection = db.collection(dbCollectionName.USER);
+const allToursRef = allDataList.doc(dbCollectionDocName.ALL_TOURS);
 
 exports.createTour = async (req, res) => {
   const { dogId, ownerId } = req.body;
@@ -43,16 +44,24 @@ exports.createTour = async (req, res) => {
   const tourListRef = tourCollection.doc();
   const tourListId = tourListRef.id;
 
+  const isUserDogOwner = req.users?.role === UserRole.DOG_OWNER;
+
+  if (isUserDogOwner) tourData.status = TourStatus.PENDING_APPROVAL;
+
   try {
     const savedTour = { ...tourData, uid: tourListId };
 
-    await tourListRef.set(savedTour);
+    const batch = db.batch();
 
-    const allToursRef = allDataList.doc(dbCollectionDocName.ALL_TOURS);
+    batch.set(savedTour);
+    batch.update(allToursRef, { [tourListId]: savedTour });
 
-    await allToursRef.update({
-      [tourListId]: savedTour,
-    });
+    await batch.commit();
+
+    if (isUserDogOwner)
+      await NotificationService.sendInstantNotification("New Tour detected", {
+        tourId: tourListId,
+      });
 
     await NotificationService.scheduleTourNotification(savedTour);
 
@@ -116,8 +125,77 @@ exports.updateTour = async (req, res) => {
   }
 };
 
+exports.updateDogOwnerTours = async (req, res) => {
+  const { ownerId, tours } = req.body;
+  /**
+   * tours would be an obj
+   * key is the id of each dog tour
+   * value would be another obj, containing startDate nad endDate
+   */
+
+  if (!ownerId) return res.status(400).json({ error: "Missing ID", code: 400 });
+
+  const batch = db.batch();
+  const updatedTours = [],
+    tourIds = [];
+
+  try {
+    // tourId use Id as reference, tourInfo contains startDate and endDate
+    for (const [tourId, tourInfo] of Object.entries(tours)) {
+      const tourRef = tourCollection.doc(tourId);
+      const tourDoc = await tourRef.get();
+
+      if (!tourDoc.exists) continue;
+
+      const tourData = tourDoc.data();
+
+      if (tourData.ownerId !== ownerId)
+        return res.status(403).json({
+          error: "Tour is under another owner, access denied",
+          code: 403,
+        });
+
+      const { startDate, endDate } = tourInfo,
+        updates = {};
+
+      if (startDate) updates.startDate = startDate;
+      if (endDate) updates.endDate = endDate;
+
+      if (Object.keys(updates).length) {
+        batch.update(tourRef, updates);
+        updatedTours.push({ ...tourData, updates });
+        tourIds.push(tourData.uid);
+      }
+
+      if (!updatedTours.length)
+        return res
+          .status(400)
+          .json({ error: "No valid tours to update", code: 400 });
+    }
+
+    const allToursUpdate = {};
+
+    updatedTours.forEach((tour) => {
+      allToursUpdate[tour.uid] = tour;
+    });
+
+    batch.update(allToursRef, allToursUpdate);
+
+    await batch.commit();
+
+    await NotificationService.sendInstantNotification("Detect Tour Update", {
+      tourIds,
+    });
+
+    return res.status(200).json(updatedTours);
+  } catch (error) {
+    return interError(res, error);
+  }
+};
+
 exports.removeTour = async (req, res) => {
   const { id } = req.params;
+  const isUserDogOwner = req.user?.role === UserRole.DOG_OWNER;
 
   if (!id) return res.status(400).json({ error: "Missing tour ID", code: 400 });
 
@@ -129,11 +207,32 @@ exports.removeTour = async (req, res) => {
     if (!doc.exists)
       return res.status(404).json({ error: "Tour not found", code: 404 });
 
-    await tourRef.delete();
+    if (isUserDogOwner) {
+      const { ownerId } = req.body;
+      if (ownerId !== doc.data().ownerId)
+        return res.status(403).json({
+          error: "Tour is under another owner, access denied",
+          code: 403,
+        });
+    }
 
-    await allDataList
-      .doc(dbCollectionDocName.ALL_TOURS)
-      .update({ [id]: admin.firestore.FieldValue.delete() });
+    const batch = db.batch();
+
+    batch.delete(tourRef);
+    batch.update(allToursRef, { [id]: admin.firestore.FieldValue.delete() });
+
+    await batch.commit();
+
+    // TODO: as the tour has already been removed at this stage, sending id as params to receivers may NOT be suitable, think about alternative info
+    // maybe readable tour info e.g., dog name, tour period and etc.
+    if (isUserDogOwner)
+      await NotificationService.sendInstantNotification(
+        "Notice: Tour Cancelled",
+        {
+          tourId: id,
+          tourStatus: TourStatus.CANCELLED,
+        }
+      );
 
     await NotificationService.cancelTourNotification(id);
 
@@ -237,6 +336,7 @@ exports.markTourFinish = async (req, res) => {
         ? docData.endDate
         : getTodayDateString(),
     };
+    ``;
 
     await tourRef.update(data);
 
@@ -281,7 +381,6 @@ exports.extractFinishedTours = async (req, res) => {
     const BATCH_LIMIT = 500;
 
     const notificationPromises = [];
-    const allToursRef = allDataList.doc(dbCollectionDocName.ALL_TOURS);
 
     for (let i = 0; i < allFinishedTours.length; i += BATCH_LIMIT) {
       const chunk = allFinishedTours.slice(i, i + BATCH_LIMIT);

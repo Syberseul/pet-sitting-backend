@@ -5,6 +5,7 @@ const userRouter = require("./userRouter");
 const dogRouter = require("./dogRouter");
 const dogOwnerRouter = require("./dogOwnerRouter");
 const tourRouter = require("./tourRouter");
+const fileRouter = require("./fileRouter");
 
 const { verifyToken } = require("../utils/jwt");
 
@@ -14,6 +15,7 @@ router.use("/users", userRouter);
 router.use("/owner", verifyToken, dogOwnerRouter);
 router.use("/dogs", verifyToken, checkModifyDog, dogRouter);
 router.use("/tour", verifyToken, tourRouter);
+router.use("/file", verifyToken, fileRouter);
 
 const wxValidationContent = "80954e3d9f517a44a6173939ffa17a55";
 router.get("/Q3aVw9J6cN.txt", (req, res) => {

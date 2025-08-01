@@ -5,6 +5,7 @@ const dbCollectionName = Object.freeze({
   DOG_OWNER: "DogOwner",
   DOG_TOUR: "DogTours",
   USER: "User",
+  DOG_IMAGE: "DogImage",
 });
 
 const dbCollectionDocName = Object.freeze({
