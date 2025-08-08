@@ -6,7 +6,6 @@ const userController = require("../controller/userController");
 const {
   checkGetAllUsers,
   updateUserInfo,
-  checkModifyTour,
 } = require("../middleware/validator/checkPermission");
 
 router.get("/all", checkGetAllUsers, userController.getAllUsers);

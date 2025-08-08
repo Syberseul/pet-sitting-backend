@@ -12,6 +12,7 @@ const { v4: uuid } = require("uuid");
 
 const admin = require("firebase-admin");
 const NotificationService = require("../Server/notificationService");
+const { tryUploadDogFile } = require("../utils/helper");
 
 const dogOwnerCollection = db.collection(dbCollectionName.DOG_OWNER);
 const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
@@ -20,7 +21,7 @@ const tourCollection = db.collection(dbCollectionName.DOG_TOUR);
 const allTourRef = allDataList.doc(dbCollectionDocName.ALL_TOURS);
 
 exports.createDog = async (req, res) => {
-  const { ownerId } = req.body;
+  const { ownerId, img } = req.body;
 
   if (!ownerId)
     return res.status(400).json({
@@ -34,6 +35,12 @@ exports.createDog = async (req, res) => {
       ...req.body,
       uid: uuid(),
     };
+
+    delete dogInfo.img;
+
+    const dogImgPath = await tryUploadDogFile(img, dogInfo.uid);
+
+    if (dogImgPath) dogInfo.imgPath = dogImgPath;
 
     let updatedOwnerData;
 
@@ -67,7 +74,7 @@ exports.createDog = async (req, res) => {
 };
 
 exports.updateDog = async (req, res) => {
-  const { ownerId, uid } = req.body;
+  const { ownerId, uid, img } = req.body;
 
   if (!ownerId || !uid) {
     return res.status(400).json({
@@ -93,15 +100,26 @@ exports.updateDog = async (req, res) => {
       const ownerDoc = await transaction.get(dogOwnerCollection.doc(ownerId));
       if (!ownerDoc.exists) throw new Error("Missing Owner info");
 
-      const newDogs = ownerDoc.data().dogs.map((d) => {
-        d.ownerId = ownerId;
-        if (d.uid !== uid) return d;
-        return {
-          ...d,
-          ...req.body,
-          uid,
-        };
-      });
+      const newDogs = await Promise.all(
+        ownerDoc.data().dogs.map(async (d) => {
+          d.ownerId = ownerId;
+          if (d.uid !== uid) return d;
+
+          const newDog = {
+            ...d,
+            ...req.body,
+            uid,
+          };
+
+          const dogImgPath = await tryUploadDogFile(img, uid);
+
+          if (dogImgPath) newDog.imgPath = dogImgPath;
+
+          delete newDog.img;
+
+          return newDog;
+        })
+      );
 
       updatedOwnerData = {
         ...ownerDoc.data(),

@@ -1,3 +1,7 @@
+const {
+  uploadDogFile,
+  getDogImgPath,
+} = require("../controller/fileController");
 const { TourStatus } = require("../enum");
 
 exports.getTourStatus = (tourInfo) => {
@@ -51,4 +55,23 @@ exports.isDateBeforeToday = (date) => {
   today.setHours(0, 0, 0, 0);
   inputDate.setHours(0, 0, 0, 0);
   return inputDate < today;
+};
+
+exports.tryUploadDogFile = async (img, dogId) => {
+  if (!img || !dogId || typeof img !== "string") return;
+
+  const base64Data = img.replace(/^data:image\/\w+;base64,/, "");
+  const imgBuffer = Buffer.from(base64Data, "base64");
+
+  try {
+    const result = await uploadDogFile(dogId, imgBuffer);
+    if (result.success) return getDogImgPath(dogId);
+    else {
+      console.error(`Image upload failed for dog ${dogId}:`, result.error);
+      return;
+    }
+  } catch (e) {
+    console.error(`Unhandled error in image upload:`, e);
+    return;
+  }
 };

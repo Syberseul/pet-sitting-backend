@@ -5,7 +5,7 @@ const { verifyPlatform } = require("./middleware/validator/checkPlatform");
 
 const app = express();
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
 const allowedOrigins = [
   "https://pet-sitting-family.vercel.app",

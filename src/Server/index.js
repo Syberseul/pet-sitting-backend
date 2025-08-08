@@ -15,7 +15,7 @@ admin.initializeApp({
 const db = admin.firestore();
 const auth = admin.auth();
 const messaging = admin.messaging();
-const bucket = admin.storage().bucket();
+const bucket = admin.storage().bucket(process.env.FIREBASE_BUCKET_URI);
 
 admin
   .auth()

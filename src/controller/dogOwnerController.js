@@ -17,6 +17,12 @@ const { v4: uuid } = require("uuid");
 
 const admin = require("firebase-admin");
 const { prepareDogRemoval } = require("./dogController");
+const {
+  uploadDogFile,
+  removeDogImg,
+  getDogImgPath,
+} = require("./fileController");
+const { tryUploadDogFile } = require("../utils/helper");
 
 const dogOwnerCollection = db.collection(dbCollectionName.DOG_OWNER);
 const allDataList = db.collection(dbCollectionName.ALL_DATA_LIST);
@@ -40,16 +46,31 @@ exports.createDogOwner = async (req, res) => {
 
     const ownerListId = ownerListRef.id;
 
+    const modifiedDogs = await Promise.all(
+      dogs.map(async (dog) => {
+        const dogId = uuid();
+        const newDog = {
+          ...DogInfo,
+          ...dog,
+          uid: dogId,
+          ownerId: ownerListId,
+        };
+
+        delete newDog.img;
+
+        const dogImgPath = await tryUploadDogFile(dog.img, dogId);
+
+        if (dogImgPath) newDog.imgPath = dogImgPath;
+
+        return newDog;
+      })
+    );
+
     const ownerData = {
       ...DogOwnerInfo,
       userId: userId ?? "",
       name: name ?? "",
-      dogs: dogs.map((dog) => ({
-        ...DogInfo,
-        ...dog,
-        uid: dog.uid ? dog.uid : uuid(),
-        ownerId: ownerListId,
-      })),
+      dogs: modifiedDogs,
       contactNo: contactNo ?? "",
       isFromWx,
       wxId: wxId ?? "",
@@ -115,18 +136,37 @@ exports.updateDogOwner = async (req, res) => {
 
     await Promise.all(dogRemovalPromises);
 
+    const dogImgRemovalPromises = removedDogs.map((dog) =>
+      removeDogImg(dog.uid)
+    );
+
+    await Promise.all(dogImgRemovalPromises);
+
+    const modifiedDogs = await Promise.all(
+      newDogs.map(async (dog) => {
+        const dogId = !dog.hasOwnProperty("uid") || !dog.uid ? uuid() : dog.uid;
+
+        const newDog = {
+          ...dog,
+          dogId,
+          ownerId: id,
+        };
+
+        delete newDog.img;
+
+        const dogImgPath = await tryUploadDogFile(dog.img, dogId);
+
+        if (dogImgPath) newDog.imgPath = dogImgPath;
+
+        return newDog;
+      })
+    );
+
     const updatedData = {
       ...currentData,
       name: name ?? "",
       contactNo: contactNo ?? "",
-      dogs: newDogs.length
-        ? newDogs.map((dog) => {
-            if (!dog.hasOwnProperty("uid") || !dog.uid) dog.uid = uuid();
-            if (!dog.hasOwnProperty("ownerId") || !dog.ownerId)
-              dog.ownerId = id;
-            return dog;
-          })
-        : [],
+      dogs: modifiedDogs.length ? modifiedDogs : [],
     };
 
     batch.update(ownerRef, updatedData);
@@ -253,8 +293,11 @@ exports.removeDogOwner = async (req, res) => {
         allNotifications.push(...result.notifications);
       })
     );
+    const dogImgRemovalPromises = dogs.map((dog) => removeDogImg(dog.uid));
 
     await Promise.all(dogRemovalPromises);
+
+    await Promise.all(dogImgRemovalPromises);
 
     batch.delete(ownerRef);
 
